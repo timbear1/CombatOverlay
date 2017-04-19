@@ -9,10 +9,16 @@ local EnemyNamePlate = core.EnemyNamePlate;
 -- CONST
 ----------------------
 local HEALTH_BAR_TEXTURE = "Interface\\AddOns\\EKplates\\media\\ufbar";
-local HEALTH_BAR_HEIGHT = 8;
+local HEALTH_BAR_HEIGHT_NORMAL = 4;
+local HEALTH_BAR_HEIGHT_TARGET = 9;
 local HEALTH_FONT_SIZE = 12;
 
 local NAME_FONT_SIZE = 14;
+
+local BAR_COLOR_ENEMY = { r = 0.92, g = 0.15, b = 0.15 }
+local BAR_COLOR_NEUTRAL = { r = 0.9, g = 0.92, b = 0.2 }
+local BAR_COLOR_FRIENDLY = { r = 0.19, g = 0.9, b = 0.22 }
+
 ----------------------
 -- EnemyNamePlate functions
 ----------------------
@@ -24,32 +30,70 @@ local function UpdateHealth(unitFrame)
 	local perc_text = string.format("%d", math.floor(perc*100));
 
     unitFrame.healthBar:SetValue(perc);
-    --if minHealth ~= maxHealth then 
-    --    unitFrame.healthBar.value:SetText(perc_text);
-    --else
-    --    unitFrame.healthBar.value:SetText("");
-    --end
-    
-    --if perc < .25 then
-    --    unitFrame.healthBar.value:SetTextColor(0.8, 0.05, 0);
-    --elseif perc < .3 then
-    --    unitFrame.healthBar.value:SetTextColor(0.95, 0.7, 0.25);
-    --else
-    --    unitFrame.healthBar.value:SetTextColor(1, 1, 1);
-    --end
+
+    local reaction = UnitReaction("player", unitFrame.unit);
+    if ( reaction == 2 ) then
+        -- ENEMY
+        unitFrame.healthBar:SetStatusBarColor(BAR_COLOR_ENEMY.r, BAR_COLOR_ENEMY.g, BAR_COLOR_ENEMY.b);
+    elseif ( reaction == 4 ) then
+        -- NEUTRAL
+        unitFrame.healthBar:SetStatusBarColor(BAR_COLOR_NEUTRAL.r, BAR_COLOR_NEUTRAL.g, BAR_COLOR_NEUTRAL.b);
+    else
+        -- FRIENDLY
+        unitFrame.healthBar:SetStatusBarColor(BAR_COLOR_FRIENDLY.r, BAR_COLOR_FRIENDLY.g, BAR_COLOR_FRIENDLY.b);
+    end
+    -- Color
+    --[[if UnitIsPlayer(unitFrame.unit) then
+
+        UnitIsEnemy
+        local _, englishClass = UnitClass(unitFrame.unit);
+        r,g,b = GetClassColor(englishClass);
+        unitFrame.healthBar:SetStatusBarColor(r, g, b);
+    else
+        unitFrame.healthBar:SetStatusBarColor(1, 1, 1);
+    end]]---
+end
+
+local function UpdateName(unitFrame)
+	local name = GetUnitName(unitFrame.displayedUnit, false) or UNKNOWN;
+	--local level = UnitLevel(unitFrame.unit);
+	
+	if name and not UnitIsUnit(unitFrame.displayedUnit, "player") then
+        local hexColor = "ffffffff";
+		if UnitIsPlayer(unitFrame.unit) then
+            local _, englishClass = UnitClass(unitFrame.unit);
+            --core:Print("Class: ", WrapTextInColorCode(englishClass, RAID_CLASS_COLORS[englishClass].colorStr));
+            hexColor = RAID_CLASS_COLORS[englishClass].colorStr;
+		end
+        unitFrame.name:SetText(WrapTextInColorCode(name, hexColor));
+	else
+        unitFrame.name:SetText("");
+    end
+end
+
+local function UpdateTarget(unitFrame)
+    local unit = unitFrame.displayedUnit;
+    if UnitIsUnit(unit,"target") then
+        unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_TARGET);
+    else
+        unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL);
+    end
 end
 
 local function OnEvent(self, event, ...)
-	--local arg1, arg2, arg3, arg4 = ...
+	local arg1, arg2, arg3, arg4 = ...
 
 	if ( event == "PLAYER_TARGET_CHANGED" ) then
-        core:Print("Target changed.");
-		--UpdateName(self)
+        --core:Print("Target changed.");
+		UpdateName(self)
+        UpdateTarget(self)
 		--UpdateSelectionHighlight(self)
 	elseif ( event == "PLAYER_ENTERING_WORLD" ) then
+        UpdateTarget(self)
 		--UpdateAll(self)
 	elseif ( arg1 == self.unit or arg1 == self.displayedUnit ) then
 		if ( event == "UNIT_HEALTH_FREQUENT" ) then
+            --core:Print("Update Health")
 			UpdateHealth(self)
 			--UpdateSelectionHighlight(self)
 		elseif ( event == "UNIT_AURA" ) then
@@ -58,11 +102,11 @@ local function OnEvent(self, event, ...)
 		elseif ( event == "UNIT_THREAT_LIST_UPDATE" ) then
 			--UpdateHealthColor(self)
 		elseif ( event == "UNIT_NAME_UPDATE" ) then
-			--UpdateName(self)
+			UpdateName(self)
 			--UpdateforBossmod(self)
 		elseif ( event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE" or event == "UNIT_PET" ) then
 			--UpdateAll(self)
-		elseif (C.show_power and event == "UNIT_POWER_FREQUENT" ) then
+		elseif (event == "UNIT_POWER_FREQUENT" ) then
 			--UpdatePower(self)
 		end
 	end
@@ -109,6 +153,12 @@ local function SetUnit(unitFrame, unit)
 	end
 end
 
+local frameBD = {
+    edgeFile = "Interface\\AddOns\\EKplates\\media\\glow", edgeSize = 3,
+    bgFile = "Interface\\Buttons\\WHITE8x8",
+    insets = {left = 3, right = 3, top = 3, bottom = 3}
+}
+
 local function CreateBackdrop(parent, anchor, a)
     local frame = CreateFrame("Frame", nil, parent)
 
@@ -128,45 +178,69 @@ local function CreateBackdrop(parent, anchor, a)
     return frame
 end
 
+local createtext = function(f, layer, fontsize, flag, justifyh)
+	local text = f:CreateFontString(nil, layer)
+	text:SetFont(STANDARD_TEXT_FONT, fontsize, flag)
+	text:SetJustifyH(justifyh)
+	return text
+end
+
 function EnemyNamePlate:Add(unit)
     local namePlate = C_NamePlate.GetNamePlateForUnit(unit);
 	SetUnit(namePlate.UnitFrame, unit);
-    core:Print("Nameplate Added!");
+    UpdateHealth(namePlate.UnitFrame);
+    UpdateName(namePlate.UnitFrame);
+    UpdateTarget(namePlate.UnitFrame);
+    --core:Print("Nameplate Added!");
 end
 
 function EnemyNamePlate:Remove(unit)
     local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
     SetUnit(namePlate.UnitFrame, nil)
-	core:Print("Nameplate removed!");
+	--core:Print("Nameplate removed!");
 end
 
 function EnemyNamePlate:Created(namePlate)
-	core:Print("Nameplate created!");
+	--core:Print("Nameplate created!");
 
     namePlate.UnitFrame = CreateFrame("Button", "$parentUnitFrame", namePlate)
 	namePlate.UnitFrame:SetAllPoints(namePlate)
 	namePlate.UnitFrame:SetFrameLevel(namePlate:GetFrameLevel())
     
     namePlate.UnitFrame.healthBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame)
-    namePlate.UnitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT)
+    namePlate.UnitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL)
     namePlate.UnitFrame.healthBar:SetPoint("LEFT", 0, 0)
     namePlate.UnitFrame.healthBar:SetPoint("RIGHT", 0, 0)
     namePlate.UnitFrame.healthBar:SetStatusBarTexture(HEALTH_BAR_TEXTURE)
     namePlate.UnitFrame.healthBar:SetMinMaxValues(0, 1)
-    
+
     namePlate.UnitFrame.healthBar.bd = CreateBackdrop(namePlate.UnitFrame.healthBar, namePlate.UnitFrame.healthBar, 1) 
-    --[[
-    namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
-    namePlate.UnitFrame.healthBar.value:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "TOPRIGHT", 0, -G.fontsize/3)
-    namePlate.UnitFrame.healthBar.value:SetTextColor(1,1,1)
-    namePlate.UnitFrame.healthBar.value:SetText("Value")
-    
-    namePlate.UnitFrame.name = createtext(namePlate.UnitFrame, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
+
+    namePlate.UnitFrame.name = createtext(namePlate.UnitFrame, "OVERLAY", NAME_FONT_SIZE-4, "OUTLINE", "CENTER")
     namePlate.UnitFrame.name:SetPoint("TOPLEFT", namePlate.UnitFrame, "TOPLEFT", 5, -5)
     namePlate.UnitFrame.name:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame, "TOPRIGHT", -5, -15)
     namePlate.UnitFrame.name:SetIndentedWordWrap(false)
     namePlate.UnitFrame.name:SetTextColor(1,1,1)
     namePlate.UnitFrame.name:SetText("Name")
+
+    --flvl = namePlate.UnitFrame.healthBar:GetFrameLevel();
+    
+     --[[
+    namePlate.UnitFrame.healthBar.bkg = CreateFrame("Frame", nil, namePlate.UnitFrame)
+    namePlate.UnitFrame.healthBar.bkg:SetHeight(HEALTH_BAR_HEIGHT)
+    namePlate.UnitFrame.healthBar.bkg:SetPoint("LEFT", 0, 0)
+    namePlate.UnitFrame.healthBar.bkg:SetPoint("RIGHT", 0, 0)
+    namePlate.UnitFrame.healthBar.bkg:SetStatusBarTexture(HEALTH_BAR_TEXTURE)
+    namePlate.UnitFrame.healthBar.bkg:SetMinMaxValues(0, 1)
+    namePlate.UnitFrame.healthBar.bkg:SetFrameLevel(flvl-1)
+    namePlate.UnitFrame.healthBar.bkg:SetStatusBarColor(1, 0, 0, 1)  
+    ]]--
+    
+    --[[
+    namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
+    namePlate.UnitFrame.healthBar.value:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "TOPRIGHT", 0, -G.fontsize/3)
+    namePlate.UnitFrame.healthBar.value:SetTextColor(1,1,1)
+    namePlate.UnitFrame.healthBar.value:SetText("Value")
     
     namePlate.UnitFrame.castBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame)
     namePlate.UnitFrame.castBar:Hide()

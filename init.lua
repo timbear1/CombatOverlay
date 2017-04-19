@@ -114,10 +114,6 @@ local function HideBlizzard()
 	end
 end
 
-local function test(namePlate)
-	core:Print(namePlate);
-end
-
 function core:OnEvent(event, ...)
 	local arg1 = ...
 
