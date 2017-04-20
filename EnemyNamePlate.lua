@@ -15,6 +15,9 @@ local HEALTH_FONT_SIZE = 12;
 
 local NAME_FONT_SIZE = 14;
 
+local POWER_BAR_HEIGHT_NORMAL = 6;
+local POWER_BAR_HEIGHT_TARGET = 2;
+
 local BAR_COLOR_ENEMY = { r = 0.92, g = 0.15, b = 0.15 }
 local BAR_COLOR_NEUTRAL = { r = 0.9, g = 0.92, b = 0.2 }
 local BAR_COLOR_FRIENDLY = { r = 0.19, g = 0.9, b = 0.22 }
@@ -27,7 +30,6 @@ local function UpdateHealth(unitFrame)
 	local unit = unitFrame.displayedUnit;
 	local minHealth, maxHealth = UnitHealth(unit), UnitHealthMax(unit);
 	local perc = minHealth/maxHealth;
-	local perc_text = string.format("%d", math.floor(perc*100));
 
     unitFrame.healthBar:SetValue(perc);
 
@@ -42,16 +44,18 @@ local function UpdateHealth(unitFrame)
         -- FRIENDLY
         unitFrame.healthBar:SetStatusBarColor(BAR_COLOR_FRIENDLY.r, BAR_COLOR_FRIENDLY.g, BAR_COLOR_FRIENDLY.b);
     end
-    -- Color
-    --[[if UnitIsPlayer(unitFrame.unit) then
+end
 
-        UnitIsEnemy
-        local _, englishClass = UnitClass(unitFrame.unit);
-        r,g,b = GetClassColor(englishClass);
-        unitFrame.healthBar:SetStatusBarColor(r, g, b);
-    else
-        unitFrame.healthBar:SetStatusBarColor(1, 1, 1);
-    end]]---
+local function UpdatePower(unitFrame)
+	local unit = unitFrame.displayedUnit;
+    local _, powerTypeString = UnitPowerType(unit);
+	local minPower, maxPower = UnitPower(unit), UnitPowerMax(unit);
+	local perc = minPower/maxPower;
+
+    unitFrame.power:SetValue(perc);
+	
+	local color = PowerBarColor[powerTypeString];
+    unitFrame.healthBar:SetStatusBarColor(color.r, color.g, color.b);
 end
 
 local function UpdateName(unitFrame)
@@ -75,8 +79,14 @@ local function UpdateTarget(unitFrame)
     local unit = unitFrame.displayedUnit;
     if UnitIsUnit(unit,"target") then
         unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_TARGET);
+        unitFrame.power:ClearAllPoints();
+        unitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, 0);
+        unitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL);
     else
         unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL);
+        unitFrame.power:ClearAllPoints();
+        unitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, 0);
+        unitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL);
     end
 end
 
@@ -84,30 +94,22 @@ local function OnEvent(self, event, ...)
 	local arg1, arg2, arg3, arg4 = ...
 
 	if ( event == "PLAYER_TARGET_CHANGED" ) then
-        --core:Print("Target changed.");
 		UpdateName(self)
         UpdateTarget(self)
-		--UpdateSelectionHighlight(self)
 	elseif ( event == "PLAYER_ENTERING_WORLD" ) then
         UpdateTarget(self)
 		--UpdateAll(self)
 	elseif ( arg1 == self.unit or arg1 == self.displayedUnit ) then
 		if ( event == "UNIT_HEALTH_FREQUENT" ) then
-            --core:Print("Update Health")
 			UpdateHealth(self)
-			--UpdateSelectionHighlight(self)
 		elseif ( event == "UNIT_AURA" ) then
 			--UpdateBuffs(self)
-			--UpdateSelectionHighlight(self)
-		elseif ( event == "UNIT_THREAT_LIST_UPDATE" ) then
-			--UpdateHealthColor(self)
 		elseif ( event == "UNIT_NAME_UPDATE" ) then
 			UpdateName(self)
-			--UpdateforBossmod(self)
 		elseif ( event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE" or event == "UNIT_PET" ) then
 			--UpdateAll(self)
 		elseif (event == "UNIT_POWER_FREQUENT" ) then
-			--UpdatePower(self)
+			UpdatePower(self)
 		end
 	end
 end
@@ -121,7 +123,6 @@ local function UpdateNamePlateEvents(unitFrame)
 	end
 	unitFrame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", unit, displayedUnit);
 	unitFrame:RegisterUnitEvent("UNIT_AURA", unit, displayedUnit);
-	unitFrame:RegisterUnitEvent("UNIT_THREAT_LIST_UPDATE", unit, displayedUnit);
     unitFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", unit, displayedUnit);
     --unitFrame.power:Show();
 end
@@ -189,53 +190,45 @@ function EnemyNamePlate:Add(unit)
     local namePlate = C_NamePlate.GetNamePlateForUnit(unit);
 	SetUnit(namePlate.UnitFrame, unit);
     UpdateHealth(namePlate.UnitFrame);
+    UpdatePower(namePlate.UnitFrame);
     UpdateName(namePlate.UnitFrame);
     UpdateTarget(namePlate.UnitFrame);
-    --core:Print("Nameplate Added!");
 end
 
 function EnemyNamePlate:Remove(unit)
     local namePlate = C_NamePlate.GetNamePlateForUnit(unit)
     SetUnit(namePlate.UnitFrame, nil)
-	--core:Print("Nameplate removed!");
 end
 
 function EnemyNamePlate:Created(namePlate)
-	--core:Print("Nameplate created!");
 
-    namePlate.UnitFrame = CreateFrame("Button", "$parentUnitFrame", namePlate)
-	namePlate.UnitFrame:SetAllPoints(namePlate)
-	namePlate.UnitFrame:SetFrameLevel(namePlate:GetFrameLevel())
+    namePlate.UnitFrame = CreateFrame("Button", "$parentUnitFrame", namePlate);
+	namePlate.UnitFrame:SetAllPoints(namePlate);
+	namePlate.UnitFrame:SetFrameLevel(namePlate:GetFrameLevel());
     
-    namePlate.UnitFrame.healthBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame)
-    namePlate.UnitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL)
-    namePlate.UnitFrame.healthBar:SetPoint("LEFT", 0, 0)
-    namePlate.UnitFrame.healthBar:SetPoint("RIGHT", 0, 0)
-    namePlate.UnitFrame.healthBar:SetStatusBarTexture(HEALTH_BAR_TEXTURE)
-    namePlate.UnitFrame.healthBar:SetMinMaxValues(0, 1)
+    namePlate.UnitFrame.healthBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL);
+    namePlate.UnitFrame.healthBar:SetPoint("LEFT", 0, 0);
+    namePlate.UnitFrame.healthBar:SetPoint("RIGHT", 0, 0);
+    namePlate.UnitFrame.healthBar:SetStatusBarTexture(HEALTH_BAR_TEXTURE);
+    namePlate.UnitFrame.healthBar:SetMinMaxValues(0, 1);
+    namePlate.UnitFrame.healthBar.bd = CreateBackdrop(namePlate.UnitFrame.healthBar, namePlate.UnitFrame.healthBar, 1);
 
-    namePlate.UnitFrame.healthBar.bd = CreateBackdrop(namePlate.UnitFrame.healthBar, namePlate.UnitFrame.healthBar, 1) 
+    namePlate.UnitFrame.power = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
+    --namePlate.UnitFrame.power:SetHeight(HEALTH_BAR_HEIGHT_NORMAL)
+    namePlate.UnitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, 0);
+    namePlate.UnitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL);
+    namePlate.UnitFrame.power:SetStatusBarTexture(HEALTH_BAR_TEXTURE);
+    namePlate.UnitFrame.power:SetMinMaxValues(0, 1);
+    namePlate.UnitFrame.power.bd = CreateBackdrop(namePlate.UnitFrame.power, namePlate.UnitFrame.power, 1);
 
-    namePlate.UnitFrame.name = createtext(namePlate.UnitFrame, "OVERLAY", NAME_FONT_SIZE-4, "OUTLINE", "CENTER")
-    namePlate.UnitFrame.name:SetPoint("TOPLEFT", namePlate.UnitFrame, "TOPLEFT", 5, -5)
-    namePlate.UnitFrame.name:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame, "TOPRIGHT", -5, -15)
-    namePlate.UnitFrame.name:SetIndentedWordWrap(false)
-    namePlate.UnitFrame.name:SetTextColor(1,1,1)
-    namePlate.UnitFrame.name:SetText("Name")
+    namePlate.UnitFrame.name = createtext(namePlate.UnitFrame, "OVERLAY", NAME_FONT_SIZE-4, "OUTLINE", "CENTER");
+    namePlate.UnitFrame.name:SetPoint("TOPLEFT", namePlate.UnitFrame, "TOPLEFT", 5, -5);
+    namePlate.UnitFrame.name:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame, "TOPRIGHT", -5, -15);
+    namePlate.UnitFrame.name:SetIndentedWordWrap(false);
+    namePlate.UnitFrame.name:SetTextColor(1,1,1);
+    namePlate.UnitFrame.name:SetText("Name");
 
-    --flvl = namePlate.UnitFrame.healthBar:GetFrameLevel();
-    
-     --[[
-    namePlate.UnitFrame.healthBar.bkg = CreateFrame("Frame", nil, namePlate.UnitFrame)
-    namePlate.UnitFrame.healthBar.bkg:SetHeight(HEALTH_BAR_HEIGHT)
-    namePlate.UnitFrame.healthBar.bkg:SetPoint("LEFT", 0, 0)
-    namePlate.UnitFrame.healthBar.bkg:SetPoint("RIGHT", 0, 0)
-    namePlate.UnitFrame.healthBar.bkg:SetStatusBarTexture(HEALTH_BAR_TEXTURE)
-    namePlate.UnitFrame.healthBar.bkg:SetMinMaxValues(0, 1)
-    namePlate.UnitFrame.healthBar.bkg:SetFrameLevel(flvl-1)
-    namePlate.UnitFrame.healthBar.bkg:SetStatusBarColor(1, 0, 0, 1)  
-    ]]--
-    
     --[[
     namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
     namePlate.UnitFrame.healthBar.value:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "TOPRIGHT", 0, -G.fontsize/3)
