@@ -11,20 +11,53 @@ local EnemyNamePlate = core.EnemyNamePlate;
 local HEALTH_BAR_TEXTURE = "Interface\\AddOns\\EKplates\\media\\ufbar";
 local HEALTH_BAR_HEIGHT_NORMAL = 4;
 local HEALTH_BAR_HEIGHT_TARGET = 9;
+local HEALTH_BAR_WIDTH_NORMAL = 20;
+local HEALTH_BAR_WIDTH_TARGET = 5;
 local HEALTH_FONT_SIZE = 12;
 
 local NAME_FONT_SIZE = 14;
 
-local POWER_BAR_HEIGHT_NORMAL = 6;
-local POWER_BAR_HEIGHT_TARGET = 2;
+local POWER_BAR_HEIGHT_NORMAL = -2;
+local POWER_BAR_HEIGHT_TARGET = -4;
 
 local BAR_COLOR_ENEMY = { r = 0.92, g = 0.15, b = 0.15 }
 local BAR_COLOR_NEUTRAL = { r = 0.9, g = 0.92, b = 0.2 }
 local BAR_COLOR_FRIENDLY = { r = 0.19, g = 0.9, b = 0.22 }
 
+local USE_HIGH_DPI_SCALE = true;
+local HIGH_DPI_SCALE = 0.5625;
+
+local AURA_ICON_SIZE = 22;
+local AURA_TARGET_MAX_NUM = 5;
+local AURA_FONT_SIZE = 12;
+local AURA_FONT = "Interface\\AddOns\\EKplates\\media\\number.ttf";
+
+core.Config.whitelistId = {
+    [0]  = true, -- test
+}
+
+core.Config.whitelistName = {
+    -- Warlock
+    ["Unstable Affliction"]  = true,
+    ["Corruption"]  = true,
+    ["Agony"]  = true,
+    ["Siphon Life"]  = true,
+    ["Phantom Fingularity"]  = true,
+    ["Phantom Fingularity"]  = true, 
+
+    -- Druid
+    ["Regrowth"] = true,
+}
 ----------------------
 -- EnemyNamePlate functions
 ----------------------
+
+local createtext = function(f, layer, fontsize, font, flag, justifyh)
+	local text = f:CreateFontString(nil, layer)
+	text:SetFont(font, fontsize, flag)
+	text:SetJustifyH(justifyh)
+	return text
+end
 
 local function UpdateHealth(unitFrame)
 	local unit = unitFrame.displayedUnit;
@@ -55,7 +88,7 @@ local function UpdatePower(unitFrame)
     unitFrame.power:SetValue(perc);
 	
 	local color = PowerBarColor[powerTypeString];
-    unitFrame.healthBar:SetStatusBarColor(color.r, color.g, color.b);
+    unitFrame.power:SetStatusBarColor(color.r, color.g, color.b);
 end
 
 local function UpdateName(unitFrame)
@@ -78,38 +111,174 @@ end
 local function UpdateTarget(unitFrame)
     local unit = unitFrame.displayedUnit;
     if UnitIsUnit(unit,"target") then
+        unitFrame.healthBar:ClearAllPoints();
         unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_TARGET);
+        unitFrame.healthBar:SetPoint("LEFT", HEALTH_BAR_WIDTH_TARGET, 0);
+        unitFrame.healthBar:SetPoint("RIGHT", HEALTH_BAR_WIDTH_TARGET*-1, 0);
+        unitFrame.healthBar.bd:SetBackdropBorderColor(0.25, 0.25, 0.25);
         unitFrame.power:ClearAllPoints();
-        unitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, 0);
-        unitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL);
+        unitFrame.power:SetPoint("TOPLEFT", unitFrame.healthBar, "BOTTOMLEFT", 0, -2);
+        unitFrame.power:SetPoint("BOTTOMRIGHT", unitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_TARGET-2);
+        unitFrame.power.bd:SetBackdropBorderColor(0.25, 0.25, 0.25);
     else
+        unitFrame.healthBar:ClearAllPoints();
         unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL);
+        unitFrame.healthBar:SetPoint("LEFT", HEALTH_BAR_WIDTH_NORMAL, 0);
+        unitFrame.healthBar:SetPoint("RIGHT", HEALTH_BAR_WIDTH_NORMAL*-1, 0);
+        unitFrame.healthBar.bd:SetBackdropBorderColor(0, 0, 0);
         unitFrame.power:ClearAllPoints();
-        unitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, 0);
-        unitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL);
+        unitFrame.power:SetPoint("TOPLEFT", unitFrame.healthBar, "BOTTOMLEFT", 0, -2);
+        unitFrame.power:SetPoint("BOTTOMRIGHT", unitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL-2);
+        unitFrame.power.bd:SetBackdropBorderColor(0, 0, 0);
     end
+end
+
+--[[ Auras ]]-- 
+
+local day, hour, minute = 86400, 3600, 60
+local function FormatTime(s)
+    if s >= day then
+        return format("%dd", floor(s/day + 0.5))
+    elseif s >= hour then
+        return format("%dh", floor(s/hour + 0.5))
+    elseif s >= minute then
+        return format("%dm", floor(s/minute + 0.5))
+    end
+
+    return format("%d", math.fmod(s, minute))
+end
+
+local function CreateAuraIcon(parent)
+	local aura = CreateFrame("Frame",nil,parent);
+	aura:SetSize(AURA_ICON_SIZE, AURA_ICON_SIZE);
+
+	aura.icon = aura:CreateTexture(nil, "OVERLAY", nil, 3);
+	aura.icon:SetPoint("TOPLEFT", aura,"TOPLEFT", 1, -1);
+	aura.icon:SetPoint("BOTTOMRIGHT", aura,"BOTTOMRIGHT",-1, 1);
+	aura.icon:SetTexCoord(.08, .92, 0.08, 0.92);
+	
+	aura.overlay = aura:CreateTexture(nil, "ARTWORK", nil, 7);
+	aura.overlay:SetTexture("Interface\\Buttons\\WHITE8x8");
+	aura.overlay:SetAllPoints(aura);
+	
+	aura.bd = aura:CreateTexture(nil, "ARTWORK", nil, 6);
+	aura.bd:SetTexture("Interface\\Buttons\\WHITE8x8");
+	aura.bd:SetVertexColor(0, 0, 0);
+	aura.bd:SetPoint("TOPLEFT", aura,"TOPLEFT", -1, 1);
+	aura.bd:SetPoint("BOTTOMRIGHT", aura,"BOTTOMRIGHT", 1, -1);
+	
+	aura.text = createtext(aura, "OVERLAY", AURA_FONT_SIZE, AURA_FONT, "OUTLINE", "CENTER");
+	aura.text:SetPoint("BOTTOM", aura, "BOTTOM", 0, -2);
+	aura.text:SetTextColor(1, 1, 0);
+	
+	aura.count = createtext(aura, "OVERLAY", AURA_FONT_SIZE-2, AURA_FONT, "OUTLINE", "RIGHT");
+	aura.count:SetPoint("TOPRIGHT", aura, "TOPRIGHT", -1, 2);
+	aura.count:SetTextColor(.4, .95, 1);
+	
+	return aura;
+end
+
+local function UpdateAuraIcon(aura, unit, index, filter, custom_icon)
+	local name, _, icon, count, debuffType, duration, expirationTime, _, _, _, spellID = UnitAura(unit, index, filter);
+	
+	aura.icon:SetTexture(icon);
+	aura.expirationTime = expirationTime;
+	aura.duration = duration;
+	aura.spellID = spellID;
+	
+	--local color = DebuffTypeColor[debuffType] or DebuffTypeColor.none;
+	aura.overlay:SetVertexColor(0.9, 0.9, 0.9)
+    --aura.overlay:SetVertexColor(color.r, color.g, color.b)
+    
+	if count and count > 1 then
+		aura.count:SetText(count)
+	else
+		aura.count:SetText("")
+	end
+	
+	aura:SetScript("OnUpdate", function(self, elapsed)
+		if not self.duration then return end
+		
+		self.elapsed = (self.elapsed or 0) + elapsed
+
+		if self.elapsed < .2 then return end
+		self.elapsed = 0
+
+		local timeLeft = self.expirationTime - GetTime()
+		if timeLeft <= 0 then
+			self.text:SetText(nil)
+		else
+			self.text:SetText(FormatTime(timeLeft))
+		end
+	end)
+	
+	aura:Show()
+end
+
+local function UpdateAuras(unitFrame)
+	if not unitFrame.icons or not unitFrame.displayedUnit then return end
+	if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No buffs on the player
+	local unit = unitFrame.displayedUnit
+	local i = 1
+
+    -- Check if we are looking for helpful or harmful auras on the target. 
+    local type = 'HELPFUL';
+    local reaction = UnitReaction("player", unitFrame.unit);
+    if ( reaction == 2 or reaction == 4) then 
+        type = 'HARMFUL';
+    end
+
+    -- Player casted auras on target.
+    -- Debuffs on enemys and buffs on friendlys
+    -- Uses whitelist filter 
+	for index = 1, 20 do
+		if ( i <= AURA_TARGET_MAX_NUM ) then
+			local dname, _, _, _, _, dduration, _, dcaster, _, _, dspellid = UnitAura(unit, index, type);
+
+            if ( dcaster == "player" ) then
+                if ( core.Config.whitelistId[dspellid] or core.Config.whitelistName[dname] ) then 
+                    -- Check if we have a icon we can reuse, if not create a new one. 
+                    if not unitFrame.icons[i] then 
+                        unitFrame.icons[i] = CreateAuraIcon(unitFrame.icons);
+                    end
+                    UpdateAuraIcon(unitFrame.icons[i], unit, index, type);
+                    if i ~= 1 then
+                        unitFrame.icons[i]:SetPoint("LEFT", unitFrame.icons[i-1], "RIGHT", 4, 0);
+                    end
+                    i = i + 1;
+                end
+            end
+		end
+	end
+	
+	unitFrame.iconnumber = i - 1
+	
+	if i > 1 then
+		unitFrame.icons[1]:SetPoint("LEFT", unitFrame.icons, "CENTER", -((AURA_ICON_SIZE+4)*(unitFrame.iconnumber)-4)/2,0)
+	end
+	for index = i, #unitFrame.icons do unitFrame.icons[index]:Hide() end
 end
 
 local function OnEvent(self, event, ...)
 	local arg1, arg2, arg3, arg4 = ...
 
 	if ( event == "PLAYER_TARGET_CHANGED" ) then
-		UpdateName(self)
-        UpdateTarget(self)
+		UpdateName(self);
+        UpdateTarget(self);
 	elseif ( event == "PLAYER_ENTERING_WORLD" ) then
-        UpdateTarget(self)
+        UpdateTarget(self);
 		--UpdateAll(self)
 	elseif ( arg1 == self.unit or arg1 == self.displayedUnit ) then
 		if ( event == "UNIT_HEALTH_FREQUENT" ) then
-			UpdateHealth(self)
+			UpdateHealth(self);
 		elseif ( event == "UNIT_AURA" ) then
-			--UpdateBuffs(self)
+			UpdateAuras(self);
 		elseif ( event == "UNIT_NAME_UPDATE" ) then
-			UpdateName(self)
+			UpdateName(self);
 		elseif ( event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE" or event == "UNIT_PET" ) then
-			--UpdateAll(self)
+			--UpdateAll(self);
 		elseif (event == "UNIT_POWER_FREQUENT" ) then
-			UpdatePower(self)
+			UpdatePower(self);
 		end
 	end
 end
@@ -179,13 +348,6 @@ local function CreateBackdrop(parent, anchor, a)
     return frame
 end
 
-local createtext = function(f, layer, fontsize, flag, justifyh)
-	local text = f:CreateFontString(nil, layer)
-	text:SetFont(STANDARD_TEXT_FONT, fontsize, flag)
-	text:SetJustifyH(justifyh)
-	return text
-end
-
 function EnemyNamePlate:Add(unit)
     local namePlate = C_NamePlate.GetNamePlateForUnit(unit);
 	SetUnit(namePlate.UnitFrame, unit);
@@ -205,29 +367,40 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame = CreateFrame("Button", "$parentUnitFrame", namePlate);
 	namePlate.UnitFrame:SetAllPoints(namePlate);
 	namePlate.UnitFrame:SetFrameLevel(namePlate:GetFrameLevel());
+
+    if (USE_HIGH_DPI_SCALE) then
+        local scale = HIGH_DPI_SCALE / UIParent:GetEffectiveScale();
+        namePlate.UnitFrame:SetScale(scale);
+    end
     
     namePlate.UnitFrame.healthBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
     namePlate.UnitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL);
-    namePlate.UnitFrame.healthBar:SetPoint("LEFT", 0, 0);
-    namePlate.UnitFrame.healthBar:SetPoint("RIGHT", 0, 0);
+    namePlate.UnitFrame.healthBar:SetPoint("LEFT", HEALTH_BAR_WIDTH_NORMAL, 0);
+    namePlate.UnitFrame.healthBar:SetPoint("RIGHT", HEALTH_BAR_WIDTH_NORMAL*-1, 0);
     namePlate.UnitFrame.healthBar:SetStatusBarTexture(HEALTH_BAR_TEXTURE);
     namePlate.UnitFrame.healthBar:SetMinMaxValues(0, 1);
     namePlate.UnitFrame.healthBar.bd = CreateBackdrop(namePlate.UnitFrame.healthBar, namePlate.UnitFrame.healthBar, 1);
 
     namePlate.UnitFrame.power = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
     --namePlate.UnitFrame.power:SetHeight(HEALTH_BAR_HEIGHT_NORMAL)
-    namePlate.UnitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, 0);
-    namePlate.UnitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL);
+    namePlate.UnitFrame.power:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, -2);
+    namePlate.UnitFrame.power:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL-2);
     namePlate.UnitFrame.power:SetStatusBarTexture(HEALTH_BAR_TEXTURE);
     namePlate.UnitFrame.power:SetMinMaxValues(0, 1);
     namePlate.UnitFrame.power.bd = CreateBackdrop(namePlate.UnitFrame.power, namePlate.UnitFrame.power, 1);
 
-    namePlate.UnitFrame.name = createtext(namePlate.UnitFrame, "OVERLAY", NAME_FONT_SIZE-4, "OUTLINE", "CENTER");
+    namePlate.UnitFrame.name = createtext(namePlate.UnitFrame, "OVERLAY", NAME_FONT_SIZE-4, STANDARD_TEXT_FONT, "OUTLINE", "CENTER");
     namePlate.UnitFrame.name:SetPoint("TOPLEFT", namePlate.UnitFrame, "TOPLEFT", 5, -5);
     namePlate.UnitFrame.name:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame, "TOPRIGHT", -5, -15);
     namePlate.UnitFrame.name:SetIndentedWordWrap(false);
     namePlate.UnitFrame.name:SetTextColor(1,1,1);
     namePlate.UnitFrame.name:SetText("Name");
+
+    namePlate.UnitFrame.icons = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.icons:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 0);
+    namePlate.UnitFrame.icons:SetWidth(140);
+    namePlate.UnitFrame.icons:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.icons:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     --[[
     namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
