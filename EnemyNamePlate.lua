@@ -32,11 +32,7 @@ local AURA_TARGET_MAX_NUM = 5;
 local AURA_FONT_SIZE = 12;
 local AURA_FONT = "Interface\\AddOns\\EKplates\\media\\number.ttf";
 
-core.Config.whitelistId = {
-    [0]  = true, -- test
-}
-
-core.Config.whitelistName = {
+core.Config.customWhitelist = {
     -- Warlock
     ["Unstable Affliction"]  = true,
     ["Corruption"]  = true,
@@ -47,6 +43,18 @@ core.Config.whitelistName = {
 
     -- Druid
     ["Regrowth"] = true,
+}
+
+core.Config.CCWhitelist = {
+    -- Warlock
+    ["Fear"]  = true,
+
+    -- Druid
+    ["Cyclone"] = true,
+}
+
+core.Config.BuffWhitelist = {
+    [""]  = true,
 }
 ----------------------
 -- EnemyNamePlate functions
@@ -215,35 +223,25 @@ local function UpdateAuraIcon(aura, unit, index, filter, custom_icon)
 	aura:Show()
 end
 
-local function UpdateAuras(unitFrame)
-	if not unitFrame.icons or not unitFrame.displayedUnit then return end
+local function UpdateAuras(unitFrame, auras, type, allAuras, whitelist)
+    if not auras or not unitFrame.displayedUnit then return end
 	if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No buffs on the player
-	local unit = unitFrame.displayedUnit
-	local i = 1
+	local unit = unitFrame.displayedUnit;
+	local i = 1;
 
-    -- Check if we are looking for helpful or harmful auras on the target. 
-    local type = 'HELPFUL';
-    local reaction = UnitReaction("player", unitFrame.unit);
-    if ( reaction == 2 or reaction == 4) then 
-        type = 'HARMFUL';
-    end
-
-    -- Player casted auras on target.
-    -- Debuffs on enemys and buffs on friendlys
-    -- Uses whitelist filter 
 	for index = 1, 20 do
 		if ( i <= AURA_TARGET_MAX_NUM ) then
 			local dname, _, _, _, _, dduration, _, dcaster, _, _, dspellid = UnitAura(unit, index, type);
 
-            if ( dcaster == "player" ) then
-                if ( core.Config.whitelistId[dspellid] or core.Config.whitelistName[dname] ) then 
+            if ( dcaster == "player" or allAuras ) then
+                if ( whitelist[dname] ) then 
                     -- Check if we have a icon we can reuse, if not create a new one. 
-                    if not unitFrame.icons[i] then 
-                        unitFrame.icons[i] = CreateAuraIcon(unitFrame.icons);
+                    if not auras[i] then 
+                        auras[i] = CreateAuraIcon(auras);
                     end
-                    UpdateAuraIcon(unitFrame.icons[i], unit, index, type);
+                    UpdateAuraIcon(auras[i], unit, index, type);
                     if i ~= 1 then
-                        unitFrame.icons[i]:SetPoint("LEFT", unitFrame.icons[i-1], "RIGHT", 4, 0);
+                        auras[i]:SetPoint("LEFT", auras[i-1], "RIGHT", 4, 0);
                     end
                     i = i + 1;
                 end
@@ -251,12 +249,25 @@ local function UpdateAuras(unitFrame)
 		end
 	end
 	
-	unitFrame.iconnumber = i - 1
+	local aurasNumber = i - 1
 	
 	if i > 1 then
-		unitFrame.icons[1]:SetPoint("LEFT", unitFrame.icons, "CENTER", -((AURA_ICON_SIZE+4)*(unitFrame.iconnumber)-4)/2,0)
+		auras[1]:SetPoint("LEFT", auras, "CENTER", -((AURA_ICON_SIZE+4)*(aurasNumber)-4)/2,0);
 	end
-	for index = i, #unitFrame.icons do unitFrame.icons[index]:Hide() end
+	for index = i, #auras do auras[index]:Hide() end
+end
+
+local function UpdateAllAuras(unitFrame)
+	-- Check if we are looking for helpful or harmful custom auras on the target. 
+    local type = 'HELPFUL';
+    local reaction = UnitReaction("player", unitFrame.unit);
+    if ( reaction == 2 or reaction == 4) then 
+        type = 'HARMFUL';
+    end
+
+    UpdateAuras(unitFrame, unitFrame.customAuras, type, false, core.Config.customWhitelist);
+    UpdateAuras(unitFrame, unitFrame.CCAuras, 'HARMFUL', true, core.Config.CCWhitelist);
+    UpdateAuras(unitFrame, unitFrame.BuffAuras, 'HELPFUL', true, core.Config.BuffWhitelist);
 end
 
 local function OnEvent(self, event, ...)
@@ -272,7 +283,7 @@ local function OnEvent(self, event, ...)
 		if ( event == "UNIT_HEALTH_FREQUENT" ) then
 			UpdateHealth(self);
 		elseif ( event == "UNIT_AURA" ) then
-			UpdateAuras(self);
+			UpdateAllAuras(self);
 		elseif ( event == "UNIT_NAME_UPDATE" ) then
 			UpdateName(self);
 		elseif ( event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE" or event == "UNIT_PET" ) then
@@ -396,11 +407,23 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.name:SetTextColor(1,1,1);
     namePlate.UnitFrame.name:SetText("Name");
 
-    namePlate.UnitFrame.icons = CreateFrame("Frame", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.icons:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 0);
-    namePlate.UnitFrame.icons:SetWidth(140);
-    namePlate.UnitFrame.icons:SetHeight(AURA_ICON_SIZE);
-    namePlate.UnitFrame.icons:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
+    namePlate.UnitFrame.customAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.customAuras:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 0);
+    namePlate.UnitFrame.customAuras:SetWidth(140);
+    namePlate.UnitFrame.customAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.customAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
+
+    namePlate.UnitFrame.CCAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.CCAuras:SetPoint("BOTTOM", namePlate.UnitFrame.customAuras, "TOP", 0, 0);
+    namePlate.UnitFrame.CCAuras:SetWidth(140);
+    namePlate.UnitFrame.CCAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.CCAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
+
+    namePlate.UnitFrame.BuffAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.BuffAuras:SetPoint("TOP", namePlate.UnitFrame.power, "BOTTOM", 0, 0);
+    namePlate.UnitFrame.BuffAuras:SetWidth(140);
+    namePlate.UnitFrame.BuffAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.BuffAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     --[[
     namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
