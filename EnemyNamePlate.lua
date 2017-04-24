@@ -289,19 +289,45 @@ end
 
 local function UpdateCastBar(unitFrame)
 	local castBar = unitFrame.castBar;
-	if not castBar.colored then
-		castBar.startCastColor = CreateColor(0.6, 0.6, 0.6);
-		castBar.startChannelColor = CreateColor(0.6, 0.6, 0.6);
-		castBar.finishedCastColor = CreateColor(0.6, 0.6, 0.6);
-		castBar.failedCastColor = CreateColor(0.5, 0.2, 0.2);
-		castBar.nonInterruptibleColor = CreateColor(0.9, 0, 1);
-		--CastingBarFrame_AddWidgetForFade(castBar, castBar.BorderShield);
-		castBar.colored = true
-	end
+    castBar.ignore = UnitIsUnit("player", unitFrame.displayedUnit);
+    castBar:Hide();
+end
 
-	--if UnitIsUnit("player", unitFrame.displayedUnit) then return end
-    --CastingBarFrame_SetUnit(castBar, unitFrame.unit, false, true);
-    CastingBarFrame_SetUnit(castBar, unitFrame.unit, false, false);
+local function SpellCastStart(unitFrame)
+    local castBar = unitFrame.castBar;
+    local unit = unitFrame.unit;
+    local name, _, text, texture, startTime, endTime, _, castid, notInterruptible, spellid = UnitCastingInfo(unitFrame.unit);
+
+    if(not name) then
+		return castbar:Hide();
+	end
+end
+
+local function SpellCastFailed(unitFrame)
+end
+
+local function SpellCastStop(unitFrame)
+end
+
+local function SpellCastInterrupted(unitFrame)
+end
+
+local function SpellCastInterruptible(unitFrame)
+end
+
+local function SpellCastNotInterruptible(unitFrame)
+end
+
+local function SpellCastDelayed(unitFrame)
+end
+
+local function SpellCastChannelStart(unitFrame)
+end
+
+local function SpellCastChannelUpdate(unitFrame)
+end
+
+local function SpellCastChannelStop(unitFrame)
 end
 
 local function OnEvent(self, event, ...)
@@ -312,7 +338,6 @@ local function OnEvent(self, event, ...)
         UpdateTarget(self);
 	elseif ( event == "PLAYER_ENTERING_WORLD" ) then
         UpdateTarget(self);
-        UpdateCastBar(self);
 		--UpdateAll(self)
 	elseif ( arg1 == self.unit or arg1 == self.displayedUnit ) then
 		if ( event == "UNIT_HEALTH_FREQUENT" ) then
@@ -325,7 +350,27 @@ local function OnEvent(self, event, ...)
 			--UpdateAll(self);
 		elseif (event == "UNIT_POWER_FREQUENT" ) then
 			UpdatePower(self);
-		end
+		elseif (event == "UNIT_SPELLCAST_START") then
+            SpellCastStart(self);
+		elseif (event == "UNIT_SPELLCAST_FAILED") then
+            SpellCastFailed(self);
+		elseif (event == "UNIT_SPELLCAST_STOP") then
+            SpellCastStop(self);
+		elseif (event == "UNIT_SPELLCAST_INTERRUPTED") then
+            SpellCastInterrupted(self);
+		elseif (event == "UNIT_SPELLCAST_INTERRUPTIBLE") then
+            SpellCastInterruptible(self);
+		elseif (event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE") then
+            SpellCastNotInterruptible(self);
+		elseif (event == "UNIT_SPELLCAST_DELAYED") then
+            SpellCastDelayed(self);
+		elseif (event == "UNIT_SPELLCAST_CHANNEL_START") then
+            SpellCastChannelStart(self);
+		elseif (event == "UNIT_SPELLCAST_CHANNEL_UPDATE") then
+            SpellCastChannelUpdate(self);
+		elseif (event == "UNIT_SPELLCAST_CHANNEL_STOP") then
+            SpellCastChannelStop(self);
+        end
 	end
 end
 
@@ -339,6 +384,16 @@ local function UpdateNamePlateEvents(unitFrame)
 	unitFrame:RegisterUnitEvent("UNIT_HEALTH_FREQUENT", unit, displayedUnit);
 	unitFrame:RegisterUnitEvent("UNIT_AURA", unit, displayedUnit);
     unitFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTIBLE", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_DELAYED", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", unit, displayedUnit);
+    unitFrame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", unit, displayedUnit);
     --unitFrame.power:Show();
 end
 
