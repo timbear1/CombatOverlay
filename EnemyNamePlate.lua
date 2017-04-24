@@ -32,6 +32,9 @@ local AURA_TARGET_MAX_NUM = 5;
 local AURA_FONT_SIZE = 12;
 local AURA_FONT = "Interface\\AddOns\\EKplates\\media\\number.ttf";
 
+local CAST_BAR_HEIGHT = 8;
+local CAST_BAR_TEXTURE = "Interface\\AddOns\\EKplates\\media\\ufbar";
+
 core.Config.customWhitelist = {
     -- Warlock
     ["Unstable Affliction"]  = true,
@@ -43,6 +46,9 @@ core.Config.customWhitelist = {
 
     -- Druid
     ["Regrowth"] = true,
+
+    -- Paladin
+    ["Judgment"] = true,
 }
 
 core.Config.CCWhitelist = {
@@ -51,6 +57,9 @@ core.Config.CCWhitelist = {
 
     -- Druid
     ["Cyclone"] = true,
+
+    -- Paladin
+    ["Hammer of Justice"] = true,
 }
 
 core.Config.BuffWhitelist = {
@@ -128,6 +137,10 @@ local function UpdateTarget(unitFrame)
         unitFrame.power:SetPoint("TOPLEFT", unitFrame.healthBar, "BOTTOMLEFT", 0, -2);
         unitFrame.power:SetPoint("BOTTOMRIGHT", unitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_TARGET-2);
         unitFrame.power.bd:SetBackdropBorderColor(0.25, 0.25, 0.25);
+        unitFrame.castBar:SetHeight(CAST_BAR_HEIGHT);
+        unitFrame.castBar:SetPoint("TOPLEFT", unitFrame.power, "BOTTOMLEFT", 0, -4);
+        unitFrame.castBar:SetPoint("TOPRIGHT", unitFrame.power, "BOTTOMRIGHT", 0, -4);
+        unitFrame.castBar.bd:SetBackdropBorderColor(0, 0, 0);
     else
         unitFrame.healthBar:ClearAllPoints();
         unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_NORMAL);
@@ -138,6 +151,10 @@ local function UpdateTarget(unitFrame)
         unitFrame.power:SetPoint("TOPLEFT", unitFrame.healthBar, "BOTTOMLEFT", 0, -2);
         unitFrame.power:SetPoint("BOTTOMRIGHT", unitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_NORMAL-2);
         unitFrame.power.bd:SetBackdropBorderColor(0, 0, 0);
+        unitFrame.castBar:SetHeight(CAST_BAR_HEIGHT);
+        unitFrame.castBar:SetPoint("TOPLEFT", unitFrame.power, "BOTTOMLEFT", 0, -4);
+        unitFrame.castBar:SetPoint("TOPRIGHT", unitFrame.power, "BOTTOMRIGHT", 0, -4);
+        unitFrame.castBar.bd:SetBackdropBorderColor(0, 0, 0);
     end
 end
 
@@ -270,6 +287,23 @@ local function UpdateAllAuras(unitFrame)
     UpdateAuras(unitFrame, unitFrame.BuffAuras, 'HELPFUL', true, core.Config.BuffWhitelist);
 end
 
+local function UpdateCastBar(unitFrame)
+	local castBar = unitFrame.castBar;
+	if not castBar.colored then
+		castBar.startCastColor = CreateColor(0.6, 0.6, 0.6);
+		castBar.startChannelColor = CreateColor(0.6, 0.6, 0.6);
+		castBar.finishedCastColor = CreateColor(0.6, 0.6, 0.6);
+		castBar.failedCastColor = CreateColor(0.5, 0.2, 0.2);
+		castBar.nonInterruptibleColor = CreateColor(0.9, 0, 1);
+		--CastingBarFrame_AddWidgetForFade(castBar, castBar.BorderShield);
+		castBar.colored = true
+	end
+
+	--if UnitIsUnit("player", unitFrame.displayedUnit) then return end
+    --CastingBarFrame_SetUnit(castBar, unitFrame.unit, false, true);
+    CastingBarFrame_SetUnit(castBar, unitFrame.unit, false, false);
+end
+
 local function OnEvent(self, event, ...)
 	local arg1, arg2, arg3, arg4 = ...
 
@@ -278,6 +312,7 @@ local function OnEvent(self, event, ...)
         UpdateTarget(self);
 	elseif ( event == "PLAYER_ENTERING_WORLD" ) then
         UpdateTarget(self);
+        UpdateCastBar(self);
 		--UpdateAll(self)
 	elseif ( arg1 == self.unit or arg1 == self.displayedUnit ) then
 		if ( event == "UNIT_HEALTH_FREQUENT" ) then
@@ -366,6 +401,8 @@ function EnemyNamePlate:Add(unit)
     UpdatePower(namePlate.UnitFrame);
     UpdateName(namePlate.UnitFrame);
     UpdateTarget(namePlate.UnitFrame);
+    UpdateAllAuras(namePlate.UnitFrame);
+    UpdateCastBar(namePlate.UnitFrame);
 end
 
 function EnemyNamePlate:Remove(unit)
@@ -414,16 +451,26 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.customAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     namePlate.UnitFrame.CCAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.CCAuras:SetPoint("BOTTOM", namePlate.UnitFrame.customAuras, "TOP", 0, 0);
+    namePlate.UnitFrame.CCAuras:SetPoint("BOTTOM", namePlate.UnitFrame.customAuras, "TOP", 0, 2);
     namePlate.UnitFrame.CCAuras:SetWidth(140);
     namePlate.UnitFrame.CCAuras:SetHeight(AURA_ICON_SIZE);
     namePlate.UnitFrame.CCAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     namePlate.UnitFrame.BuffAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.BuffAuras:SetPoint("TOP", namePlate.UnitFrame.power, "BOTTOM", 0, 0);
+    namePlate.UnitFrame.BuffAuras:SetPoint("TOP", namePlate.UnitFrame.power, "BOTTOM", 0, -4);
     namePlate.UnitFrame.BuffAuras:SetWidth(140);
     namePlate.UnitFrame.BuffAuras:SetHeight(AURA_ICON_SIZE);
     namePlate.UnitFrame.BuffAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
+
+    namePlate.UnitFrame.castBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.castBar:Hide();
+    namePlate.UnitFrame.castBar:SetHeight(CAST_BAR_HEIGHT);
+    namePlate.UnitFrame.castBar:SetPoint("TOPLEFT", namePlate.UnitFrame.power, "BOTTOMLEFT", 0, -4);
+    namePlate.UnitFrame.castBar:SetPoint("TOPRIGHT", namePlate.UnitFrame.power, "BOTTOMRIGHT", 0, -4);
+    namePlate.UnitFrame.castBar:SetStatusBarTexture(CAST_BAR_TEXTURE);
+    namePlate.UnitFrame.castBar:SetStatusBarColor(0.5, 0.5, 0.5)
+    namePlate.UnitFrame.castBar.bd = CreateBackdrop(namePlate.UnitFrame.castBar, namePlate.UnitFrame.castBar, 1);
+
 
     --[[
     namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
