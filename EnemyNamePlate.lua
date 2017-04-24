@@ -34,6 +34,8 @@ local AURA_FONT = "Interface\\AddOns\\EKplates\\media\\number.ttf";
 
 local CAST_BAR_HEIGHT = 8;
 local CAST_BAR_TEXTURE = "Interface\\AddOns\\EKplates\\media\\ufbar";
+local CAST_BAR_COLOR_INTERRUPTIBLE = { r = 1.0, g = 0.77, b = 0.0 }
+local CAST_BAR_COLOR_NOT_INTERRUPTIBLE = { r = 0.5, g = 0.5, b = 0.5 }
 
 core.Config.customWhitelist = {
     -- Warlock
@@ -137,6 +139,20 @@ local function UpdateTarget(unitFrame)
         unitFrame.power:SetPoint("TOPLEFT", unitFrame.healthBar, "BOTTOMLEFT", 0, -2);
         unitFrame.power:SetPoint("BOTTOMRIGHT", unitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_TARGET-2);
         unitFrame.power.bd:SetBackdropBorderColor(0.25, 0.25, 0.25);
+        unitFrame.castBar:SetHeight(CAST_BAR_HEIGHT);
+        unitFrame.castBar:SetPoint("TOPLEFT", unitFrame.power, "BOTTOMLEFT", 0, -4);
+        unitFrame.castBar:SetPoint("TOPRIGHT", unitFrame.power, "BOTTOMRIGHT", 0, -4);
+        unitFrame.castBar.bd:SetBackdropBorderColor(0, 0, 0);
+    elseif UnitIsUnit(unitFrame.displayedUnit, "player") then
+        unitFrame.healthBar:ClearAllPoints();
+        unitFrame.healthBar:SetHeight(HEALTH_BAR_HEIGHT_TARGET);
+        unitFrame.healthBar:SetPoint("LEFT", HEALTH_BAR_WIDTH_TARGET, 0);
+        unitFrame.healthBar:SetPoint("RIGHT", HEALTH_BAR_WIDTH_TARGET*-1, 0);
+        unitFrame.healthBar.bd:SetBackdropBorderColor(0, 0, 0);
+        unitFrame.power:ClearAllPoints();
+        unitFrame.power:SetPoint("TOPLEFT", unitFrame.healthBar, "BOTTOMLEFT", 0, -2);
+        unitFrame.power:SetPoint("BOTTOMRIGHT", unitFrame.healthBar, "BOTTOMRIGHT", 0, POWER_BAR_HEIGHT_TARGET-2);
+        unitFrame.power.bd:SetBackdropBorderColor(0, 0, 0);
         unitFrame.castBar:SetHeight(CAST_BAR_HEIGHT);
         unitFrame.castBar:SetPoint("TOPLEFT", unitFrame.power, "BOTTOMLEFT", 0, -4);
         unitFrame.castBar:SetPoint("TOPRIGHT", unitFrame.power, "BOTTOMRIGHT", 0, -4);
@@ -294,40 +310,156 @@ local function UpdateCastBar(unitFrame)
 end
 
 local function SpellCastStart(unitFrame)
+    --if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No cast bar on the player
     local castBar = unitFrame.castBar;
     local unit = unitFrame.unit;
     local name, _, text, texture, startTime, endTime, _, castid, notInterruptible, spellid = UnitCastingInfo(unitFrame.unit);
-
+    
     if(not name) then
-		return castbar:Hide();
+		return castBar:Hide();
 	end
+
+    endTime = endTime / 1e3;
+	startTime = startTime / 1e3;
+    local duration = endTime - startTime;
+
+    castBar.castid = castid;
+	castBar.startTime = startTime;
+    castBar.endTime = endTime;
+	castBar.casting = true;
+
+    castBar:SetMinMaxValues(0, 1);
+    castBar:SetValue(0);
+
+    if ( notInterruptible ) then
+        castBar:SetStatusBarColor(CAST_BAR_COLOR_NOT_INTERRUPTIBLE.r, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.g, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.b);
+    else
+        castBar:SetStatusBarColor(CAST_BAR_COLOR_INTERRUPTIBLE.r, CAST_BAR_COLOR_INTERRUPTIBLE.g, CAST_BAR_COLOR_INTERRUPTIBLE.b);
+    end
+
+    unitFrame.castBar:Show();
+    unitFrame.castBar.text:SetText(name);
 end
 
-local function SpellCastFailed(unitFrame)
+local function SpellCastFailed(unitFrame, castId)
+    if (unitFrame.castBar.castid ~= castId) then return end
+    unitFrame.castBar:Hide();
+    unitFrame.castBar.casting = false;
 end
 
-local function SpellCastStop(unitFrame)
+local function SpellCastStop(unitFrame, castId)
+    if (unitFrame.castBar.castid ~= castId) then return end
+    unitFrame.castBar:Hide();
+    unitFrame.castBar.casting = false;
 end
 
-local function SpellCastInterrupted(unitFrame)
+local function SpellCastInterrupted(unitFrame, castId)
+    if (unitFrame.castBar.castid ~= castId) then return end
+    unitFrame.castBar:Hide();
+    unitFrame.castBar.casting = false;
 end
 
 local function SpellCastInterruptible(unitFrame)
+    unitFrame.castBar:SetStatusBarColor(CAST_BAR_COLOR_INTERRUPTIBLE.r, CAST_BAR_COLOR_INTERRUPTIBLE.g, CAST_BAR_COLOR_INTERRUPTIBLE.b);
 end
 
 local function SpellCastNotInterruptible(unitFrame)
+    unitFrame.castBar:SetStatusBarColor(CAST_BAR_COLOR_NOT_INTERRUPTIBLE.r, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.g, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.b);
 end
 
 local function SpellCastDelayed(unitFrame)
+    --core:Print("Spell Cast: Delayed");
+    local castBar = unitFrame.castBar;
+    local unit = unitFrame.unit;
+    local name, _, _, _, startTime, endTime, _, castid = UnitCastingInfo(unitFrame.unit);
+
+     if(not name) then
+		return castBar:Hide();
+	end
+
+    endTime = endTime / 1e3;
+	startTime = startTime / 1e3;
+
+	castBar.startTime = startTime;
+    castBar.endTime = endTime;
+
 end
 
 local function SpellCastChannelStart(unitFrame)
+    if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No cast bar on the player
+    local castBar = unitFrame.castBar;
+    local unit = unitFrame.unit;
+    local name, _, _, texture, startTime, endTime, _, notInterruptible = UnitChannelInfo(unit);
+    
+    if(not name) then
+		return castBar:Hide();
+	end
+
+    endTime = endTime / 1e3;
+	startTime = startTime / 1e3;
+    local duration = endTime - startTime;
+
+	castBar.startTime = startTime;
+    castBar.endTime = endTime;
+	castBar.channeling = true;
+    castBar.casting = false;
+    castBar.castId = nil;
+
+    castBar:SetMinMaxValues(0, 1);
+    castBar:SetValue(0);
+
+    if ( notInterruptible ) then
+        castBar:SetStatusBarColor(CAST_BAR_COLOR_NOT_INTERRUPTIBLE.r, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.g, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.b);
+    else
+        castBar:SetStatusBarColor(CAST_BAR_COLOR_INTERRUPTIBLE.r, CAST_BAR_COLOR_INTERRUPTIBLE.g, CAST_BAR_COLOR_INTERRUPTIBLE.b);
+    end
+
+    unitFrame.castBar:Show();
+    unitFrame.castBar.text:SetText(name);
 end
 
 local function SpellCastChannelUpdate(unitFrame)
+    --if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No cast bar on the player
+    local castBar = unitFrame.castBar;
+    local unit = unitFrame.unit;
+    local name, _, _, _, startTime, endTime = UnitChannelInfo(unit);
+    
+    if(not name) then
+		return castBar:Hide();
+	end
+
+    endTime = endTime / 1e3;
+	startTime = startTime / 1e3;
+    local duration = endTime - startTime;
+
+	castBar.startTime = startTime;
+    castBar.endTime = endTime;
 end
 
 local function SpellCastChannelStop(unitFrame)
+    if (unitFrame.castBar.castid ~= castId) then return end
+    unitFrame.castBar:Hide();
+    unitFrame.castBar.casting = false;
+end
+
+local function CastBarOnUpdate(self, elapsed)
+    if(self.casting) then
+		local duration = (GetTime() - self.startTime) / (self.endTime - self.startTime);
+		if(duration >= 1) then
+			self.casting = false;
+			self:Hide();
+			return
+		end
+		self:SetValue(duration);
+    elseif (self.channeling) then
+        local duration = (GetTime() - self.startTime) / (self.endTime - self.startTime);
+		if(duration >= 1.0) then
+			self.casting = false;
+			self:Hide();
+			return
+		end
+        self:SetValue(1.0 - duration);
+    end
 end
 
 local function OnEvent(self, event, ...)
@@ -353,11 +485,11 @@ local function OnEvent(self, event, ...)
 		elseif (event == "UNIT_SPELLCAST_START") then
             SpellCastStart(self);
 		elseif (event == "UNIT_SPELLCAST_FAILED") then
-            SpellCastFailed(self);
+            SpellCastFailed(self, arg4);
 		elseif (event == "UNIT_SPELLCAST_STOP") then
-            SpellCastStop(self);
+            SpellCastStop(self, arg4);
 		elseif (event == "UNIT_SPELLCAST_INTERRUPTED") then
-            SpellCastInterrupted(self);
+            SpellCastInterrupted(self, arg4);
 		elseif (event == "UNIT_SPELLCAST_INTERRUPTIBLE") then
             SpellCastInterruptible(self);
 		elseif (event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE") then
@@ -458,6 +590,10 @@ function EnemyNamePlate:Add(unit)
     UpdateTarget(namePlate.UnitFrame);
     UpdateAllAuras(namePlate.UnitFrame);
     UpdateCastBar(namePlate.UnitFrame);
+
+    -- Check if the target is already casting/channeling something
+    SpellCastStart(namePlate.UnitFrame);
+    SpellCastChannelStart(namePlate.UnitFrame);
 end
 
 function EnemyNamePlate:Remove(unit)
@@ -500,7 +636,7 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.name:SetText("Name");
 
     namePlate.UnitFrame.customAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.customAuras:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 0);
+    namePlate.UnitFrame.customAuras:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 2);
     namePlate.UnitFrame.customAuras:SetWidth(140);
     namePlate.UnitFrame.customAuras:SetHeight(AURA_ICON_SIZE);
     namePlate.UnitFrame.customAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
@@ -518,14 +654,22 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.BuffAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     namePlate.UnitFrame.castBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.castBar:Hide();
+    --namePlate.UnitFrame.castBar:Hide();
     namePlate.UnitFrame.castBar:SetHeight(CAST_BAR_HEIGHT);
     namePlate.UnitFrame.castBar:SetPoint("TOPLEFT", namePlate.UnitFrame.power, "BOTTOMLEFT", 0, -4);
     namePlate.UnitFrame.castBar:SetPoint("TOPRIGHT", namePlate.UnitFrame.power, "BOTTOMRIGHT", 0, -4);
     namePlate.UnitFrame.castBar:SetStatusBarTexture(CAST_BAR_TEXTURE);
-    namePlate.UnitFrame.castBar:SetStatusBarColor(0.5, 0.5, 0.5)
+    namePlate.UnitFrame.castBar:SetMinMaxValues(0, 1);
+    namePlate.UnitFrame.castBar:SetStatusBarColor(0.5, 0.5, 0.5);
     namePlate.UnitFrame.castBar.bd = CreateBackdrop(namePlate.UnitFrame.castBar, namePlate.UnitFrame.castBar, 1);
+    namePlate.UnitFrame.castBar:SetScript("OnUpdate", CastBarOnUpdate);
 
+    namePlate.UnitFrame.castBar.text = createtext(namePlate.UnitFrame.castBar, "OVERLAY", NAME_FONT_SIZE-4, STANDARD_TEXT_FONT, "OUTLINE", "CENTER");
+    namePlate.UnitFrame.castBar.text:SetPoint("TOPLEFT", namePlate.UnitFrame.castBar, "TOPLEFT", 0, 0);
+    namePlate.UnitFrame.castBar.text:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.castBar, "BOTTOMRIGHT", 0, 0);
+    namePlate.UnitFrame.castBar.text:SetIndentedWordWrap(false);
+    namePlate.UnitFrame.castBar.text:SetTextColor(1,1,1);
+    namePlate.UnitFrame.castBar.text:SetText("");
 
     --[[
     namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
