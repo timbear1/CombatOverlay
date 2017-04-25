@@ -56,12 +56,89 @@ core.Config.customWhitelist = {
 core.Config.CCWhitelist = {
     -- Warlock
     ["Fear"]  = true,
+    ["Axe Toss"] = true,
+    ["Shadowfury"] = true,
+    ["Summon Infernal"] = true,
+    ["Summon Abyssal"] = true,
+    ["Banish"] = true,
+    ["Blood Horror"] = true,
+    ["Mortal Coil"] = true,
+    ["Howl of Terror"] = true,
+    ["Mesmerize"] = true,
+    ["Seduction"] = true,
 
     -- Druid
     ["Cyclone"] = true,
+    ["Maim"] = true,
+    ["Mighty Bash"] = true,
+    ["Incapacitating Roar"] = true,
+    ["Solar Beam"] = true,
+
+    -- Hunter
+    ["Binding Shot"] = true,
+    ["Intimidation"] = true,
+    ["Freezing Trap"] = true,
+    ["Wyvern Sting"] = true,
+
+    -- Mage
+    ["Deep Freeze"] = true,
+    ["Polymorph"] = true,
+    ["Ring of Frost"] = true,
+    ["Dragon's Breath"] = true,
+    ["Frostjaw"] = true,
+
+    -- Monk
+    ["Charging Ox Wave"] = true,
+    ["Fists of Fury"] = true,
+    ["Leg Sweep"] = true,
+    ["Paralysis"] = true,
 
     -- Paladin
     ["Hammer of Justice"] = true,
+    ["Fist of Justice"] = true,
+    ["Holy Wrath"] = true,
+    ["Repentance"] = true,
+    ["Blinding Light"] = true,
+    ["Turn Evil"] = true,
+    ["Avenger's Shield"] = true,
+
+    -- Priest
+    ["Mind Control"] = true,
+    ["Holy Word: Chastise"] = true,
+    ["Psychic Horror"] = true,
+    ["Shackle Undead"] = true,
+    ["Psychic Scream"] = true,
+    ["Silence"] = true,
+
+    -- Rogue
+    ["Cheap Shot"] = true,
+    ["Kidney Shot"] = true,
+    ["Gouge"] = true,
+    ["Sap"] = true,
+    ["Blind"] = true,
+    ["Garrote"] = true,
+
+    -- Shaman
+    ["Pulverize"] = true,
+    ["Capacitor Totem"] = true,
+    ["Hex"] = true,
+
+    -- Death knight
+    ["Asphyxiate"] = true,
+    ["Gnaw"] = true,
+    ["Remorseless Winter"] = true,
+    ["Asphyxiate"] = true,
+    ["Strangulate"] = true,
+
+    -- Warrior
+    ["Shockwave"] = true,
+    ["Storm Bolt"] = true,
+    ["Intimidating Shout"] = true,
+
+    -- Race
+    ["War Stomp"] = true,
+    ["Quaking Palm"] = true,
+    ["Arcane Torrent"] = true,
 }
 
 core.Config.BuffWhitelist = {
@@ -329,7 +406,9 @@ local function SpellCastStart(unitFrame)
 	castBar.casting = true;
 
     castBar:SetMinMaxValues(0, 1);
-    castBar:SetValue(0);
+
+    local duration = (GetTime() - startTime) / (endTime - startTime);
+    castBar:SetValue(duration);
 
     if ( notInterruptible ) then
         castBar:SetStatusBarColor(CAST_BAR_COLOR_NOT_INTERRUPTIBLE.r, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.g, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.b);
@@ -406,7 +485,9 @@ local function SpellCastChannelStart(unitFrame)
     castBar.castId = nil;
 
     castBar:SetMinMaxValues(0, 1);
-    castBar:SetValue(0);
+
+    local duration = (GetTime() - startTime) / (endTime - startTime);
+    castBar:SetValue(1.0 - duration);
 
     if ( notInterruptible ) then
         castBar:SetStatusBarColor(CAST_BAR_COLOR_NOT_INTERRUPTIBLE.r, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.g, CAST_BAR_COLOR_NOT_INTERRUPTIBLE.b);
@@ -592,8 +673,13 @@ function EnemyNamePlate:Add(unit)
     UpdateCastBar(namePlate.UnitFrame);
 
     -- Check if the target is already casting/channeling something
-    SpellCastStart(namePlate.UnitFrame);
-    SpellCastChannelStart(namePlate.UnitFrame);
+    local casting = UnitCastingInfo(unit);
+    local channeling = UnitChannelInfo(unit);
+    if ( casting ) then
+        SpellCastStart(namePlate.UnitFrame);
+    elseif ( channeling ) then
+        SpellCastChannelStart(namePlate.UnitFrame);
+    end
 end
 
 function EnemyNamePlate:Remove(unit)
