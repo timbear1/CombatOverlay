@@ -1,0 +1,9 @@
+## Interface: 70200
+## Title: |cff00ccffGlad|rPlates
+## Author: Timotii
+## DefaultState: enabled
+## SavedVariables: GladplatesDB
+
+config.lua
+nameplate.lua
+init.lua

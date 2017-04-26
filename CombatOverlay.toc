@@ -1,9 +1,0 @@
-## Interface: 70200
-## Title: |cff00ccffCombat Overlay|r
-## Author: Timotii
-## DefaultState: enabled
-## SavedVariables: CombatOverlayDB
-
-config.lua
-EnemyNamePlate.lua
-init.lua

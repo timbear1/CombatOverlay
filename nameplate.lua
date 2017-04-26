@@ -31,11 +31,18 @@ local AURA_ICON_SIZE = 22;
 local AURA_TARGET_MAX_NUM = 5;
 local AURA_FONT_SIZE = 12;
 local AURA_FONT = "Interface\\AddOns\\EKplates\\media\\number.ttf";
+local AURA_STATUS_BAR_COLOR = { r = 1.0, g = 0.77, b = 0.0 }
 
 local CAST_BAR_HEIGHT = 8;
 local CAST_BAR_TEXTURE = "Interface\\AddOns\\EKplates\\media\\ufbar";
 local CAST_BAR_COLOR_INTERRUPTIBLE = { r = 1.0, g = 0.77, b = 0.0 }
 local CAST_BAR_COLOR_NOT_INTERRUPTIBLE = { r = 0.5, g = 0.5, b = 0.5 }
+
+local CLASS_RESOURCE_HEIGHT = 10;
+local CLASS_RESOURCE_SPACING = 2;
+local CLASS_RESOURCE_COLOR = { r = 0.8, g = 0.8, b = 0.8 }
+
+local MY_CLASS = select(2, UnitClass("player"));  --dont touch this
 
 core.Config.customWhitelist = {
     -- Warlock
@@ -142,7 +149,10 @@ core.Config.CCWhitelist = {
 }
 
 core.Config.BuffWhitelist = {
-    [""]  = true,
+    -- Warlock
+    ["Unending Resolve"]  = true,
+    ["Nether Ward"]  = true,
+
 }
 ----------------------
 -- EnemyNamePlate functions
@@ -286,13 +296,28 @@ local function CreateAuraIcon(parent)
 	aura.bd:SetPoint("BOTTOMRIGHT", aura,"BOTTOMRIGHT", 1, -1);
 	
 	aura.text = createtext(aura, "OVERLAY", AURA_FONT_SIZE, AURA_FONT, "OUTLINE", "CENTER");
-	aura.text:SetPoint("BOTTOM", aura, "BOTTOM", 0, -2);
+	aura.text:SetPoint("BOTTOM", aura, "BOTTOM", 0, 3);
 	aura.text:SetTextColor(1, 1, 0);
 	
 	aura.count = createtext(aura, "OVERLAY", AURA_FONT_SIZE-2, AURA_FONT, "OUTLINE", "RIGHT");
 	aura.count:SetPoint("TOPRIGHT", aura, "TOPRIGHT", -1, 2);
 	aura.count:SetTextColor(.4, .95, 1);
-	
+
+    aura.statusBar = CreateFrame("StatusBar", nil, aura);
+    aura.statusBar:SetPoint("BOTTOM", aura, "BOTTOM", 0, 0);
+    aura.statusBar:SetHeight(4);
+    aura.statusBar:SetWidth(AURA_ICON_SIZE);
+    aura.statusBar:SetMinMaxValues(0, 1);
+    aura.statusBar:SetValue(1.0);
+    aura.statusBar:SetStatusBarTexture(HEALTH_BAR_TEXTURE);
+    aura.statusBar:SetStatusBarColor(AURA_STATUS_BAR_COLOR.r, AURA_STATUS_BAR_COLOR.g, AURA_STATUS_BAR_COLOR.b);
+    local flvl = aura:GetFrameLevel();
+	aura.statusBar:SetFrameLevel(flvl+1);
+
+    aura.statusBar.bg = aura.statusBar:CreateTexture(nil, "BACKGROUND");
+	aura.statusBar.bg:SetAllPoints(aura.statusBar);
+	aura.statusBar.bg:SetColorTexture(0.8, 0.8, 0.8);
+
 	return aura;
 end
 
@@ -303,7 +328,7 @@ local function UpdateAuraIcon(aura, unit, index, filter, custom_icon)
 	aura.expirationTime = expirationTime;
 	aura.duration = duration;
 	aura.spellID = spellID;
-	
+    aura.startTime = expirationTime - duration;
 	--local color = DebuffTypeColor[debuffType] or DebuffTypeColor.none;
 	aura.overlay:SetVertexColor(0.9, 0.9, 0.9)
     --aura.overlay:SetVertexColor(color.r, color.g, color.b)
@@ -313,6 +338,12 @@ local function UpdateAuraIcon(aura, unit, index, filter, custom_icon)
 	else
 		aura.count:SetText("")
 	end
+
+    -- Debuffs that last forever like corruption with Absolute Corruption talent 
+    -- Show them as full duration always. 
+    if (duration == 0) then
+        aura.statusBar:SetValue(1.0);
+    end
 	
 	aura:SetScript("OnUpdate", function(self, elapsed)
 		if not self.duration then return end
@@ -322,11 +353,14 @@ local function UpdateAuraIcon(aura, unit, index, filter, custom_icon)
 		if self.elapsed < .2 then return end
 		self.elapsed = 0
 
-		local timeLeft = self.expirationTime - GetTime()
+        
+		local timeLeft = self.expirationTime - GetTime();
+        local relativeTimeLeft = (GetTime() - self.startTime) / (self.expirationTime - self.startTime);
 		if timeLeft <= 0 then
 			self.text:SetText(nil)
 		else
 			self.text:SetText(FormatTime(timeLeft))
+            self.statusBar:SetValue(1.0 - relativeTimeLeft);
 		end
 	end)
 	
@@ -364,7 +398,9 @@ local function UpdateAuras(unitFrame, auras, type, allAuras, whitelist)
 	if i > 1 then
 		auras[1]:SetPoint("LEFT", auras, "CENTER", -((AURA_ICON_SIZE+4)*(aurasNumber)-4)/2,0);
 	end
-	for index = i, #auras do auras[index]:Hide() end
+	for index = i, #auras do 
+        auras[index]:Hide(); 
+    end
 end
 
 local function UpdateAllAuras(unitFrame)
@@ -387,7 +423,7 @@ local function UpdateCastBar(unitFrame)
 end
 
 local function SpellCastStart(unitFrame)
-    --if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No cast bar on the player
+    if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No cast bar on the player
     local castBar = unitFrame.castBar;
     local unit = unitFrame.unit;
     local name, _, text, texture, startTime, endTime, _, castid, notInterruptible, spellid = UnitCastingInfo(unitFrame.unit);
@@ -543,6 +579,85 @@ local function CastBarOnUpdate(self, elapsed)
     end
 end
 
+local function SetupClassResourcePoints(classResource, numPoints)
+    for i = 1, 6 do
+        local width = (140.0/6.0) - CLASS_RESOURCE_SPACING;
+        local position = (width * (i-1)) + (CLASS_RESOURCE_SPACING * (i-1)) + 1;
+
+        classResource[i]:SetSize(width, CLASS_RESOURCE_HEIGHT);
+        classResource[i]:SetPoint("LEFT", classResource, "LEFT", position, 0);
+    end
+end
+
+local function RegisterClassResource(classResource)
+    classResource:RegisterEvent("UNIT_POWER_FREQUENT");
+    classResource:RegisterEvent("PLAYER_ENTERING_WORLD");
+    classResource:RegisterEvent("NAME_PLATE_UNIT_ADDED");
+    classResource:RegisterEvent("NAME_PLATE_UNIT_REMOVED");
+    classResource:RegisterEvent("PLAYER_TARGET_CHANGED");
+    classResource:RegisterEvent("RUNE_POWER_UPDATE");
+end
+
+local function UnRegisterClassResource(classResource)
+    classResource:UnregisterEvent("UNIT_POWER_FREQUENT");
+    classResource:UnregisterEvent("PLAYER_ENTERING_WORLD");
+    classResource:UnregisterEvent("NAME_PLATE_UNIT_ADDED");
+    classResource:UnregisterEvent("NAME_PLATE_UNIT_REMOVED");
+    classResource:UnregisterEvent("PLAYER_TARGET_CHANGED");
+    classResource:UnregisterEvent("RUNE_POWER_UPDATE");
+end
+
+local function UpdateClassResource(unitFrame)
+    local classResource = unitFrame.classResource;
+
+    if not UnitIsUnit(unitFrame.displayedUnit, "player")  then 
+        UnRegisterClassResource(classResource);
+        classResource:Hide();
+        return
+    end
+
+    local ClassPowerID, ClassPowerType, RequireSpec;
+    if(MY_CLASS == 'MONK') then  
+        ClassPowerID = SPELL_POWER_CHI;
+        ClassPowerType = "CHI";
+        RequireSpec = SPEC_MONK_WINDWALKER;
+    elseif(MY_CLASS == 'PALADIN') then  
+        ClassPowerID = SPELL_POWER_HOLY_POWER;
+        ClassPowerType = "HOLY_POWER";
+        RequireSpec = SPEC_PALADIN_RETRIBUTION;
+    elseif(MY_CLASS == 'MAGE') then  
+        ClassPowerID = SPELL_POWER_ARCANE_CHARGES;
+        ClassPowerType = "ARCANE_CHARGES";
+        RequireSpec = SPEC_MAGE_ARCANE;
+    elseif(MY_CLASS == 'WARLOCK') then  
+        ClassPowerID = SPELL_POWER_SOUL_SHARDS;
+        ClassPowerType = "SOUL_SHARDS";
+    elseif(MY_CLASS == 'ROGUE' or MY_CLASS == 'DRUID') then  
+        ClassPowerID = SPELL_POWER_COMBO_POINTS;
+        ClassPowerType = "COMBO_POINTS";
+    end  
+
+    RegisterClassResource(classResource);
+    SetupClassResourcePoints(classResource, 6);
+    classResource:Show();
+
+    classResource:SetScript("OnEvent", function(self, event, unit, powerType)  
+        if event == "PLAYER_TALENT_UPDATE" then  
+			if core:multicheck(MY_CLASS, "WARLOCK", "PALADIN", "MONK", "MAGE", "ROGUE", "DRUID", "DEATHKNIGHT") and not RequireSpec or RequireSpec == GetSpecialization() then
+				RegisterClassResource(self);
+				self:Show();
+                core:Print("Talent Change to ret!");
+			else  
+				UnRegisterClassResource(self);
+				self:Hide();
+			end
+		elseif event == "PLAYER_ENTERING_WORLD" or (event == "UNIT_POWER_FREQUENT" and unit == "player" and powerType == ClassPowerType) then  
+
+        end
+    end)
+    classResource:RegisterEvent("PLAYER_TALENT_UPDATE");
+end
+
 local function OnEvent(self, event, ...)
 	local arg1, arg2, arg3, arg4 = ...
 
@@ -671,6 +786,7 @@ function EnemyNamePlate:Add(unit)
     UpdateTarget(namePlate.UnitFrame);
     UpdateAllAuras(namePlate.UnitFrame);
     UpdateCastBar(namePlate.UnitFrame);
+    UpdateClassResource(namePlate.UnitFrame);
 
     -- Check if the target is already casting/channeling something
     local casting = UnitCastingInfo(unit);
@@ -725,19 +841,13 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.customAuras:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 2);
     namePlate.UnitFrame.customAuras:SetWidth(140);
     namePlate.UnitFrame.customAuras:SetHeight(AURA_ICON_SIZE);
-    namePlate.UnitFrame.customAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
+    namePlate.UnitFrame.customAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);    
 
     namePlate.UnitFrame.CCAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
     namePlate.UnitFrame.CCAuras:SetPoint("BOTTOM", namePlate.UnitFrame.customAuras, "TOP", 0, 2);
     namePlate.UnitFrame.CCAuras:SetWidth(140);
     namePlate.UnitFrame.CCAuras:SetHeight(AURA_ICON_SIZE);
     namePlate.UnitFrame.CCAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
-
-    namePlate.UnitFrame.BuffAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.BuffAuras:SetPoint("TOP", namePlate.UnitFrame.power, "BOTTOM", 0, -4);
-    namePlate.UnitFrame.BuffAuras:SetWidth(140);
-    namePlate.UnitFrame.BuffAuras:SetHeight(AURA_ICON_SIZE);
-    namePlate.UnitFrame.BuffAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     namePlate.UnitFrame.castBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
     --namePlate.UnitFrame.castBar:Hide();
@@ -757,106 +867,34 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.castBar.text:SetTextColor(1,1,1);
     namePlate.UnitFrame.castBar.text:SetText("");
 
-    --[[
-    namePlate.UnitFrame.healthBar.value = createtext(namePlate.UnitFrame.healthBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
-    namePlate.UnitFrame.healthBar.value:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.healthBar, "TOPRIGHT", 0, -G.fontsize/3)
-    namePlate.UnitFrame.healthBar.value:SetTextColor(1,1,1)
-    namePlate.UnitFrame.healthBar.value:SetText("Value")
-    
-    namePlate.UnitFrame.castBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame)
-    namePlate.UnitFrame.castBar:Hide()
-    namePlate.UnitFrame.castBar.iconWhenNoninterruptible = false
-    namePlate.UnitFrame.castBar:SetHeight(8)
-    if C.classresource_show and C.classresource == "target" then  
-        namePlate.UnitFrame.castBar:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, -7)  
-        namePlate.UnitFrame.castBar:SetPoint("TOPRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, -7)  
-    else  
-        namePlate.UnitFrame.castBar:SetPoint("TOPLEFT", namePlate.UnitFrame.healthBar, "BOTTOMLEFT", 0, -3)  
-        namePlate.UnitFrame.castBar:SetPoint("TOPRIGHT", namePlate.UnitFrame.healthBar, "BOTTOMRIGHT", 0, -3)  
-    end  
+    namePlate.UnitFrame.BuffAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.BuffAuras:SetPoint("TOP", namePlate.UnitFrame.castBar, "BOTTOM", 0, -4);
+    namePlate.UnitFrame.BuffAuras:SetWidth(140);
+    namePlate.UnitFrame.BuffAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.BuffAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
-    namePlate.UnitFrame.castBar:SetStatusBarTexture(G.ufbar)
-    namePlate.UnitFrame.castBar:SetStatusBarColor(0.5, 0.5, 0.5)
-    createBackdrop(namePlate.UnitFrame.castBar, namePlate.UnitFrame.castBar, 1) 
-        
-    namePlate.UnitFrame.castBar.Text = createtext(namePlate.UnitFrame.castBar, "OVERLAY", G.fontsize-4, G.fontflag, "CENTER")
-    namePlate.UnitFrame.castBar.Text:SetPoint("TOPLEFT", namePlate.UnitFrame.castBar, "BOTTOMLEFT", -5, 5)
-    namePlate.UnitFrame.castBar.Text:SetPoint("TOPRIGHT", namePlate.UnitFrame.castBar, "BOTTOMRIGHT", 5, -5)
-    namePlate.UnitFrame.castBar.Text:SetText("Spell Name")
-    
-    namePlate.UnitFrame.castBar.Icon = namePlate.UnitFrame.castBar:CreateTexture(nil, "OVERLAY", 1)
-    namePlate.UnitFrame.castBar.Icon:SetPoint("BOTTOMRIGHT", namePlate.UnitFrame.castBar, "BOTTOMLEFT", -4, -1)
-    namePlate.UnitFrame.castBar.Icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-    if C.classresource_show and C.classresource == "target" then  
-        namePlate.UnitFrame.castBar.Icon:SetSize(25, 25)  
-    else  
-        namePlate.UnitFrame.castBar.Icon:SetSize(21, 21)  
-    end  
+    -- Class resource, combo points, holy power, shards m.m. 
+    namePlate.UnitFrame.classResource = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    namePlate.UnitFrame.classResource:SetPoint("BOTTOM", namePlate.UnitFrame.healthBar, "TOP", 0, 4);
+    namePlate.UnitFrame.classResource:SetWidth(140);
+    namePlate.UnitFrame.classResource:SetHeight(CLASS_RESOURCE_HEIGHT);
+    namePlate.UnitFrame.classResource:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
-    namePlate.UnitFrame.castBar.Icon.iconborder = CreateBG(namePlate.UnitFrame.castBar.Icon)
-    namePlate.UnitFrame.castBar.Icon.iconborder:SetDrawLayer("OVERLAY", -1)
-    
-    namePlate.UnitFrame.castBar.BorderShield = namePlate.UnitFrame.castBar:CreateTexture(nil, "OVERLAY", 1)
-    namePlate.UnitFrame.castBar.BorderShield:SetAtlas("nameplates-InterruptShield")
-    namePlate.UnitFrame.castBar.BorderShield:SetSize(15, 15)
-    namePlate.UnitFrame.castBar.BorderShield:SetPoint("LEFT", namePlate.UnitFrame.castBar, "LEFT", 5, -5)
+    for i = 1, 6 do
+        namePlate.UnitFrame.classResource[i] = CreateFrame("Frame", nil, namePlate.UnitFrame.classResource);
+		namePlate.UnitFrame.classResource[i]:SetFrameLevel(namePlate.UnitFrame.classResource:GetFrameLevel() + 1);
+		namePlate.UnitFrame.classResource[i].texture = namePlate.UnitFrame.classResource[i]:CreateTexture(nil, "BACKGROUND");
+		namePlate.UnitFrame.classResource[i].texture:SetAllPoints(namePlate.UnitFrame.classResource[i]);
+        namePlate.UnitFrame.classResource[i].texture:SetColorTexture(0.8, 0.8, 0.8);
+	end
 
-    namePlate.UnitFrame.castBar.Spark = namePlate.UnitFrame.castBar:CreateTexture(nil, "OVERLAY")
-    namePlate.UnitFrame.castBar.Spark:SetSize(30, 25)
-    namePlate.UnitFrame.castBar.Spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
-    namePlate.UnitFrame.castBar.Spark:SetBlendMode("ADD")
-    namePlate.UnitFrame.castBar.Spark:SetPoint("CENTER", 0, -1)
-    
-    namePlate.UnitFrame.castBar.Flash = namePlate.UnitFrame.castBar:CreateTexture(nil, "OVERLAY")
-    namePlate.UnitFrame.castBar.Flash:SetAllPoints()
-    namePlate.UnitFrame.castBar.Flash:SetTexture(G.ufbar)
-    namePlate.UnitFrame.castBar.Flash:SetBlendMode("ADD")
-    
-    CastingBarFrame_OnLoad(namePlate.UnitFrame.castBar, nil, false, true)
-    namePlate.UnitFrame.castBar:SetScript("OnEvent", CastingBarFrame_OnEvent)
-    namePlate.UnitFrame.castBar:SetScript("OnUpdate", CastingBarFrame_OnUpdate)
-    namePlate.UnitFrame.castBar:SetScript("OnShow", CastingBarFrame_OnShow)
+    SetupClassResourcePoints(namePlate.UnitFrame.classResource, 6);
+    namePlate.UnitFrame.classResource:Hide();
 
-    namePlate.UnitFrame.RaidTargetFrame = CreateFrame("Frame", nil, namePlate.UnitFrame)
-    namePlate.UnitFrame.RaidTargetFrame:SetSize(30, 30)
+    --namePlate.UnitFrame.classResource.texture = namePlate.UnitFrame.classResource:CreateTexture(nil, "OVERLAY");
+    --namePlate.UnitFrame.classResource.texture:SetAllPoints(namePlate.UnitFrame.classResource);
+    --namePlate.UnitFrame.classResource.texture:SetColorTexture(0.8, 0.0, 0.0);
+    --namePlate.UnitFrame.classResource:Hide();
     
-    if C.boss_mod_hidename then
-        namePlate.UnitFrame.RaidTargetFrame:SetPoint("TOP", namePlate.UnitFrame, "BOTTOM", 0, 30)
-    else
-        namePlate.UnitFrame.RaidTargetFrame:SetPoint("RIGHT", namePlate.UnitFrame.name, "LEFT")
-    end
-    
-    namePlate.UnitFrame.RaidTargetFrame.RaidTargetIcon = namePlate.UnitFrame.RaidTargetFrame:CreateTexture(nil, "OVERLAY")
-    namePlate.UnitFrame.RaidTargetFrame.RaidTargetIcon:SetTexture(G.raidicon)
-    namePlate.UnitFrame.RaidTargetFrame.RaidTargetIcon:SetAllPoints()
-    namePlate.UnitFrame.RaidTargetFrame.RaidTargetIcon:Hide()
-    
-    namePlate.UnitFrame.redarrow = namePlate.UnitFrame:CreateTexture("$parent_Arrow", 'OVERLAY')
-    namePlate.UnitFrame.redarrow:SetSize(50, 50)
-    if C.HideArrow then
-        namePlate.UnitFrame.redarrow:SetAlpha(0)
-    end
-    if C.HorizontalArrow then
-        namePlate.UnitFrame.redarrow:SetTexture(G.redarrow2)
-    else
-        namePlate.UnitFrame.redarrow:SetTexture(G.redarrow1)
-    end
-    namePlate.UnitFrame.redarrow:SetPoint("CENTER")
-    namePlate.UnitFrame.redarrow:Hide()
-    
-    namePlate.UnitFrame.icons = CreateFrame("Frame", nil, namePlate.UnitFrame)
-    namePlate.UnitFrame.icons:SetPoint("BOTTOM", namePlate.UnitFrame, "TOP", 0, 0)
-    namePlate.UnitFrame.icons:SetWidth(140)
-    namePlate.UnitFrame.icons:SetHeight(C.auraiconsize)
-    namePlate.UnitFrame.icons:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2)
-    
-    namePlate.UnitFrame.power = namePlate.UnitFrame:CreateFontString(nil, "OVERLAY")
-    namePlate.UnitFrame.power:SetFont(G.numberstylefont, G.fontsize, "OUTLINE")
-    namePlate.UnitFrame.power:SetPoint("LEFT", namePlate.UnitFrame.healthBar, "RIGHT", 2, 2)
-    namePlate.UnitFrame.power:SetTextColor(.8,.8,1)
-    namePlate.UnitFrame.power:SetShadowColor(0, 0, 0, 0.4)
-    namePlate.UnitFrame.power:SetShadowOffset(1, -1)
-    namePlate.UnitFrame.power:SetText("55")
-    ]]--
 	namePlate.UnitFrame:EnableMouse(false)
 end

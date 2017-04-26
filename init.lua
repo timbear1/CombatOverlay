@@ -59,7 +59,7 @@ end
 
 -- WARNING: self automatically becomes events frame!
 function core:Init(name)
-	if (name ~= "CombatOverlay") then return end 
+	if (name ~= "Gladplates") then return end 
 
 	-- allows using left and right buttons to move through chat 'edit' box
 	for i = 1, NUM_CHAT_WINDOWS do

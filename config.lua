@@ -24,8 +24,15 @@ local defaults = {
 --------------------------------------
 function core:Print(...)
     local hex = select(4, self.Config:GetThemeColor());
-    local prefix = string.format("|cff%s%s|r", hex:upper(), "Combat Overlay:");	
+    local prefix = string.format("|cff%s%s|r", hex:upper(), "Gladplates:");	
     DEFAULT_CHAT_FRAME:AddMessage(string.join(" ", prefix, ...));
+end
+
+function core:multicheck(check, ...)  
+	for i=1, select("#", ...) do  
+		if check == select(i, ...) then return true end  
+	end  
+	return false  
 end
 
 function Config:Toggle()
@@ -61,14 +68,14 @@ local function ScrollFrame_OnMouseWheel(self, delta)
 end
 
 function Config:CreateMenu()
-	UIConfig = CreateFrame("Frame", "AuraTrackerConfig", UIParent, "UIPanelDialogTemplate");
+	UIConfig = CreateFrame("Frame", "GladplatesConfig", UIParent, "UIPanelDialogTemplate");
 	UIConfig:SetSize(350, 400);
 	UIConfig:SetPoint("CENTER"); -- Doesn't need to be ("CENTER", UIParent, "CENTER")
 	
 	UIConfig.title:ClearAllPoints();
 	UIConfig.title:SetFontObject("GameFontHighlight");
 	UIConfig.title:SetPoint("LEFT", AuraTrackerConfigTitleBG, "LEFT", 6, 1);
-	UIConfig.title:SetText("Aura Tracker Options");	
+	UIConfig.title:SetText("Gladplates Options");
 	
 	UIConfig.ScrollFrame = CreateFrame("ScrollFrame", nil, UIConfig, "UIPanelScrollFrameTemplate");
 	UIConfig.ScrollFrame:SetPoint("TOPLEFT", AuraTrackerConfigDialogBG, "TOPLEFT", 4, -8);
@@ -88,46 +95,46 @@ function Config:CreateMenu()
 	-- Buttons
 	----------------------------------
 	-- Save Button:
-	UIConfig.saveBtn = self:CreateButton("CENTER", child, "TOP", -70, "Save");
+	--UIConfig.saveBtn = self:CreateButton("CENTER", child, "TOP", -70, "Save");
 
 	-- Reset Button:	
-	UIConfig.resetBtn = self:CreateButton("TOP", UIConfig.saveBtn, "BOTTOM", -10, "Reset");
+	--UIConfig.resetBtn = self:CreateButton("TOP", UIConfig.saveBtn, "BOTTOM", -10, "Reset");
 
 	-- Load Button:	
-	UIConfig.loadBtn = self:CreateButton("TOP", UIConfig.resetBtn, "BOTTOM", -10, "Load");
+	--UIConfig.loadBtn = self:CreateButton("TOP", UIConfig.resetBtn, "BOTTOM", -10, "Load");
 
 	----------------------------------
 	-- Sliders
 	----------------------------------
 	-- Slider 1:
-	UIConfig.slider1 = CreateFrame("SLIDER", nil, UIConfig.ScrollFrame, "OptionsSliderTemplate");
-	UIConfig.slider1:SetPoint("TOP", UIConfig.loadBtn, "BOTTOM", 0, -20);
-	UIConfig.slider1:SetMinMaxValues(1, 100);
-	UIConfig.slider1:SetValue(50);
-	UIConfig.slider1:SetValueStep(30);
-	UIConfig.slider1:SetObeyStepOnDrag(true);
+	--UIConfig.slider1 = CreateFrame("SLIDER", nil, UIConfig.ScrollFrame, "OptionsSliderTemplate");
+	--UIConfig.slider1:SetPoint("TOP", UIConfig.loadBtn, "BOTTOM", 0, -20);
+	--UIConfig.slider1:SetMinMaxValues(1, 100);
+	--UIConfig.slider1:SetValue(50);
+	--UIConfig.slider1:SetValueStep(30);
+	--UIConfig.slider1:SetObeyStepOnDrag(true);
 
 	-- Slider 2:
-	UIConfig.slider2 = CreateFrame("SLIDER", nil, UIConfig.ScrollFrame, "OptionsSliderTemplate");
-	UIConfig.slider2:SetPoint("TOP", UIConfig.slider1, "BOTTOM", 0, -20);
-	UIConfig.slider2:SetMinMaxValues(1, 100);
-	UIConfig.slider2:SetValue(40);
-	UIConfig.slider2:SetValueStep(30);
-	UIConfig.slider2:SetObeyStepOnDrag(true);
+	--UIConfig.slider2 = CreateFrame("SLIDER", nil, UIConfig.ScrollFrame, "OptionsSliderTemplate");
+	--UIConfig.slider2:SetPoint("TOP", UIConfig.slider1, "BOTTOM", 0, -20);
+	--UIConfig.slider2:SetMinMaxValues(1, 100);
+	--UIConfig.slider2:SetValue(40);
+	--UIConfig.slider2:SetValueStep(30);
+	--UIConfig.slider2:SetObeyStepOnDrag(true);
 
 	----------------------------------
 	-- Check Buttons
 	----------------------------------
 	-- Check Button 1:
-	UIConfig.checkBtn1 = CreateFrame("CheckButton", nil, UIConfig.ScrollFrame, "UICheckButtonTemplate");
-	UIConfig.checkBtn1:SetPoint("TOPLEFT", UIConfig.slider1, "BOTTOMLEFT", -10, -40);
-	UIConfig.checkBtn1.text:SetText("My Check Button!");
+	--UIConfig.checkBtn1 = CreateFrame("CheckButton", nil, UIConfig.ScrollFrame, "UICheckButtonTemplate");
+	--UIConfig.checkBtn1:SetPoint("TOPLEFT", UIConfig.slider1, "BOTTOMLEFT", -10, -40);
+	--UIConfig.checkBtn1.text:SetText("My Check Button!");
 
 	-- Check Button 2:
-	UIConfig.checkBtn2 = CreateFrame("CheckButton", nil, UIConfig.ScrollFrame, "UICheckButtonTemplate");
-	UIConfig.checkBtn2:SetPoint("TOPLEFT", UIConfig.checkBtn1, "BOTTOMLEFT", 0, -10);
-	UIConfig.checkBtn2.text:SetText("Another Check Button!");
-	UIConfig.checkBtn2:SetChecked(true);
+	--UIConfig.checkBtn2 = CreateFrame("CheckButton", nil, UIConfig.ScrollFrame, "UICheckButtonTemplate");
+	--UIConfig.checkBtn2:SetPoint("TOPLEFT", UIConfig.checkBtn1, "BOTTOMLEFT", 0, -10);
+	--UIConfig.checkBtn2.text:SetText("Another Check Button!");
+	--UIConfig.checkBtn2:SetChecked(true);
 	
 	UIConfig:Hide();
 	return UIConfig;
