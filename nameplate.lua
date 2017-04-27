@@ -579,9 +579,9 @@ local function CastBarOnUpdate(self, elapsed)
     end
 end
 
-local function SetupClassResourcePoints(classResource, numPoints)
-    for i = 1, 6 do
-        local width = (140.0/6.0) - CLASS_RESOURCE_SPACING;
+local function SetupClassResourcePoints(classResource, max)
+    for i = 1, max do
+        local width = (140.0/max) - CLASS_RESOURCE_SPACING;
         local position = (width * (i-1)) + (CLASS_RESOURCE_SPACING * (i-1)) + 1;
 
         classResource[i]:SetSize(width, CLASS_RESOURCE_HEIGHT);
@@ -607,13 +607,26 @@ local function UnRegisterClassResource(classResource)
     classResource:UnregisterEvent("RUNE_POWER_UPDATE");
 end
 
+local function UpdateCurrentClassResourcePoints(classResource, classPowerId)
+    local cur = UnitPower('player', classPowerId);
+	local max = UnitPowerMax('player', classPowerId);
+
+    for i = 1, max do
+        if(i <= cur) then  
+            classResource[i]:Show()  
+        else  
+            classResource[i]:Hide()  
+        end  
+    end
+end
+
 local function UpdateClassResource(unitFrame)
     local classResource = unitFrame.classResource;
 
     if not UnitIsUnit(unitFrame.displayedUnit, "player")  then 
         UnRegisterClassResource(classResource);
         classResource:Hide();
-        return
+        return;
     end
 
     local ClassPowerID, ClassPowerType, RequireSpec;
@@ -635,24 +648,35 @@ local function UpdateClassResource(unitFrame)
     elseif(MY_CLASS == 'ROGUE' or MY_CLASS == 'DRUID') then  
         ClassPowerID = SPELL_POWER_COMBO_POINTS;
         ClassPowerType = "COMBO_POINTS";
-    end  
+    elseif(MY_CLASS == 'DEATHKNIGHT') then
+        -- TODO
+        return;
+    else
+        UnRegisterClassResource(classResource);
+        classResource:Hide();
+        return;
+    end
 
     RegisterClassResource(classResource);
-    SetupClassResourcePoints(classResource, 6);
+    SetupClassResourcePoints(classResource, UnitPowerMax('player', ClassPowerID));
+    UpdateCurrentClassResourcePoints(classResource, ClassPowerID);
     classResource:Show();
 
     classResource:SetScript("OnEvent", function(self, event, unit, powerType)  
-        if event == "PLAYER_TALENT_UPDATE" then  
-			if core:multicheck(MY_CLASS, "WARLOCK", "PALADIN", "MONK", "MAGE", "ROGUE", "DRUID", "DEATHKNIGHT") and not RequireSpec or RequireSpec == GetSpecialization() then
+        if event == "PLAYER_TALENT_UPDATE" then
+			if not RequireSpec or RequireSpec == GetSpecialization() then
 				RegisterClassResource(self);
 				self:Show();
-                core:Print("Talent Change to ret!");
 			else  
 				UnRegisterClassResource(self);
 				self:Hide();
 			end
 		elseif event == "PLAYER_ENTERING_WORLD" or (event == "UNIT_POWER_FREQUENT" and unit == "player" and powerType == ClassPowerType) then  
-
+            if core:multicheck(MY_CLASS, "WARLOCK", "PALADIN", "MONK", "MAGE", "ROGUE", "DRUID") then  
+                UpdateCurrentClassResourcePoints(self, ClassPowerID);
+            elseif MY_CLASS == "DEATHKNIGHT" and event == "RUNE_POWER_UPDATE" then
+                -- TODO
+            end
         end
     end)
     classResource:RegisterEvent("PLAYER_TALENT_UPDATE");
