@@ -27,37 +27,58 @@ local BAR_COLOR_FRIENDLY = { r = 0.19, g = 0.9, b = 0.22 }
 local USE_HIGH_DPI_SCALE = true;
 local HIGH_DPI_SCALE = 0.5625;
 
-local AURA_ICON_SIZE = 22;
+local AURA_ICON_SIZE = 40;
+local AURA_ICON_WIDTH = 25;
+local AURA_ICON_HEIGHT = 25;
 local AURA_TARGET_MAX_NUM = 5;
 local AURA_FONT_SIZE = 12;
 local AURA_FONT = "Interface\\AddOns\\EKplates\\media\\number.ttf";
 local AURA_STATUS_BAR_COLOR = { r = 1.0, g = 0.77, b = 0.0 }
+
+local AURA_CUSTOM_FONT_SIZE = 20;
 
 local CAST_BAR_HEIGHT = 8;
 local CAST_BAR_TEXTURE = "Interface\\AddOns\\EKplates\\media\\ufbar";
 local CAST_BAR_COLOR_INTERRUPTIBLE = { r = 1.0, g = 0.77, b = 0.0 }
 local CAST_BAR_COLOR_NOT_INTERRUPTIBLE = { r = 0.5, g = 0.5, b = 0.5 }
 
+local CLASS_RESOURCE_WIDTH = 130;
 local CLASS_RESOURCE_HEIGHT = 10;
 local CLASS_RESOURCE_SPACING = 2;
-local CLASS_RESOURCE_COLOR = { r = 0.8, g = 0.8, b = 0.8 }
+local CLASS_RESOURCE_COLOR = { r = 1.0, g = 0.9, b = 0.0 }
 
 local MY_CLASS = select(2, UnitClass("player"));  --dont touch this
 
 core.Config.customWhitelist = {
     -- Warlock
-    ["Unstable Affliction"]  = true,
-    ["Corruption"]  = true,
-    ["Agony"]  = true,
-    ["Siphon Life"]  = true,
-    ["Phantom Fingularity"]  = true,
-    ["Phantom Fingularity"]  = true, 
+    --["Unstable Affliction"] = { r = 1.0, g = 0.0, b = 0.0 },
+    ["Corruption"] = { r = 1.0, g = 0.0, b = 0.0 },
+    ["Agony"] = { r = 1.0, g = 1.0, b = 0.0 },
+    ["Siphon Life"] = { r = 0.0, g = 1.0, b = 0.0 },
+    ["Doom"] = { r = 0.0, g = 1.0, b = 0.0 },
 
     -- Druid
-    ["Regrowth"] = true,
+    ["Rip"] = { r = 1.0, g = 0.0, b = 0.0 },
+    ["Rake"] = { r = 1.0, g = 0.6, b = 0.0 },
+    ["Moonfire"] = { r = 0.3, g = 0.3, b = 1.0 },
+    ["Sunfire"] = { r = 1.0, g = 1.0, b = 0.0 },
 
-    -- Paladin
-    ["Judgment"] = true,
+--
+    ---- Paladin
+    ["Judgment"] = { r = 1.0, g = 1.0, b = 0.0 },
+
+    -- Hunter
+    ["Vampiric Touch"] = { r = 0.2, g = 0.0, b = 1.0 },
+    ["Shadow Word: Pain"] = { r = 1.0, g = 1.0, b = 0.0 },
+    
+    -- Priest
+    ["Hunter's Mark"] = { r = 1.0, g = 0.0, b = 0.0 },
+    ["Vulnerable"] = { r = 1.0, g = 1.0, b = 0.0 },
+
+    ---- Rogue
+    --["Rupture"] = true,
+    --["Garrote"] = true,
+    --["Kingsbane"] = true,
 }
 
 core.Config.CCWhitelist = {
@@ -123,7 +144,7 @@ core.Config.CCWhitelist = {
     ["Gouge"] = true,
     ["Sap"] = true,
     ["Blind"] = true,
-    ["Garrote"] = true,
+    --["Garrote"] = true,
 
     -- Shaman
     ["Pulverize"] = true,
@@ -194,7 +215,9 @@ local function UpdatePower(unitFrame)
     unitFrame.power:SetValue(perc);
 	
 	local color = PowerBarColor[powerTypeString];
-    unitFrame.power:SetStatusBarColor(color.r, color.g, color.b);
+    if color then
+        unitFrame.power:SetStatusBarColor(color.r, color.g, color.b);
+    end
 end
 
 local function UpdateName(unitFrame)
@@ -278,7 +301,7 @@ end
 
 local function CreateAuraIcon(parent)
 	local aura = CreateFrame("Frame",nil,parent);
-	aura:SetSize(AURA_ICON_SIZE, AURA_ICON_SIZE);
+	aura:SetSize(AURA_ICON_WIDTH, AURA_ICON_HEIGHT);
 
 	aura.icon = aura:CreateTexture(nil, "OVERLAY", nil, 3);
 	aura.icon:SetPoint("TOPLEFT", aura,"TOPLEFT", 1, -1);
@@ -305,8 +328,8 @@ local function CreateAuraIcon(parent)
 
     aura.statusBar = CreateFrame("StatusBar", nil, aura);
     aura.statusBar:SetPoint("BOTTOM", aura, "BOTTOM", 0, 0);
-    aura.statusBar:SetHeight(4);
-    aura.statusBar:SetWidth(AURA_ICON_SIZE);
+    aura.statusBar:SetHeight(4);    
+    aura.statusBar:SetWidth(AURA_ICON_WIDTH);
     aura.statusBar:SetMinMaxValues(0, 1);
     aura.statusBar:SetValue(1.0);
     aura.statusBar:SetStatusBarTexture(HEALTH_BAR_TEXTURE);
@@ -316,7 +339,22 @@ local function CreateAuraIcon(parent)
 
     aura.statusBar.bg = aura.statusBar:CreateTexture(nil, "BACKGROUND");
 	aura.statusBar.bg:SetAllPoints(aura.statusBar);
-	aura.statusBar.bg:SetColorTexture(0.8, 0.8, 0.8);
+	aura.statusBar.bg:SetColorTexture(0.2, 0.2, 0.2);
+
+	return aura;
+end
+
+local function CreateCustomAuraIcon(parent)
+	local aura = CreateFrame("Frame",nil,parent);
+	aura:SetSize(AURA_ICON_WIDTH, AURA_ICON_HEIGHT);
+	
+	aura.text = createtext(aura, "OVERLAY", AURA_CUSTOM_FONT_SIZE, AURA_FONT, "OUTLINE", "CENTER");
+	aura.text:SetPoint("BOTTOM", aura, "BOTTOM", 0, 3);
+	--aura.text:SetTextColor(textColor.r, textColor.g, textColor.b);
+	
+	aura.count = createtext(aura, "OVERLAY", AURA_FONT_SIZE-2, AURA_FONT, "OUTLINE", "RIGHT");
+	aura.count:SetPoint("TOPRIGHT", aura, "TOPRIGHT", -1, 2);
+	aura.count:SetTextColor(.4, .95, 1);
 
 	return aura;
 end
@@ -367,6 +405,50 @@ local function UpdateAuraIcon(aura, unit, index, filter, custom_icon)
 	aura:Show()
 end
 
+local function UpdateCustomAuraIcon(aura, unit, index, filter, custom_icon)
+	local name, _, icon, count, debuffType, duration, expirationTime, _, _, _, spellID = UnitAura(unit, index, filter);
+
+	aura.expirationTime = expirationTime;
+	aura.duration = duration;
+	aura.spellID = spellID;
+    aura.startTime = expirationTime - duration;
+    
+	if count and count > 1 then
+		aura.count:SetText(count);
+	else
+		aura.count:SetText("");
+	end
+
+    -- Debuffs that last forever like corruption with Absolute Corruption talent 
+    -- Show them as full duration always.
+    aura.endless = false; 
+    if (duration == 0) then
+        aura.text:SetText("∞");
+        aura.endless = true;
+    end
+	
+	aura:SetScript("OnUpdate", function(self, elapsed)
+		if not self.duration then return end
+		
+		self.elapsed = (self.elapsed or 0) + elapsed
+
+		if self.elapsed < .2 then return end
+		self.elapsed = 0
+
+		local timeLeft = self.expirationTime - GetTime();
+        local relativeTimeLeft = (GetTime() - self.startTime) / (self.expirationTime - self.startTime);
+		if self.endless then
+            self.text:SetText("∞");
+        elseif timeLeft <= 0 then
+			self.text:SetText(nil);
+		else
+			self.text:SetText(FormatTime(timeLeft));
+		end
+	end)
+	
+	aura:Show();
+end
+
 local function UpdateAuras(unitFrame, auras, type, allAuras, whitelist)
     if not auras or not unitFrame.displayedUnit then return end
 	if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No buffs on the player
@@ -396,14 +478,20 @@ local function UpdateAuras(unitFrame, auras, type, allAuras, whitelist)
 	local aurasNumber = i - 1
 	
 	if i > 1 then
-		auras[1]:SetPoint("LEFT", auras, "CENTER", -((AURA_ICON_SIZE+4)*(aurasNumber)-4)/2,0);
+		auras[1]:SetPoint("LEFT", auras, "CENTER", -((AURA_ICON_WIDTH+4)*(aurasNumber)-4)/2,0);
 	end
 	for index = i, #auras do 
         auras[index]:Hide(); 
     end
 end
 
-local function UpdateAllAuras(unitFrame)
+local function UpdateCustomAuras(unitFrame)
+	local unit = unitFrame.displayedUnit;
+    local auras = unitFrame.customAuras;
+
+    if not auras or not unitFrame.displayedUnit then return end
+    if UnitIsUnit(unitFrame.displayedUnit, "player") then return end -- No buffs on the player
+
 	-- Check if we are looking for helpful or harmful custom auras on the target. 
     local type = 'HELPFUL';
     local reaction = UnitReaction("player", unitFrame.unit);
@@ -411,7 +499,42 @@ local function UpdateAllAuras(unitFrame)
         type = 'HARMFUL';
     end
 
-    UpdateAuras(unitFrame, unitFrame.customAuras, type, false, core.Config.customWhitelist);
+    local i = 1;
+	for index = 1, 20 do
+		if ( i <= AURA_TARGET_MAX_NUM ) then
+			local dname, _, _, _, _, dduration, _, dcaster, _, _, dspellid = UnitAura(unit, index, type);
+
+            if (dcaster == "player") then
+                local color = core.Config.customWhitelist[dname];
+                if ( color ) then 
+                    -- Check if we have a icon we can reuse, if not create a new one. 
+                    if not auras[i] then 
+                        auras[i] = CreateCustomAuraIcon(auras);
+                    end
+                    auras[i].text:SetTextColor(color.r, color.g, color.b);
+                    UpdateCustomAuraIcon(auras[i], unit, index, type);
+                    if i ~= 1 then
+                        auras[i]:SetPoint("LEFT", auras[i-1], "RIGHT", 4, 0);
+                    end
+                    i = i + 1;
+                end
+            end
+		end
+	end
+	
+	local aurasNumber = i - 1
+	
+	if i > 1 then
+		auras[1]:SetPoint("LEFT", auras, "CENTER", -((AURA_ICON_WIDTH+4)*(aurasNumber)-4)/2,0);
+	end
+	for index = i, #auras do 
+        auras[index]:Hide(); 
+    end
+end
+
+local function UpdateAllAuras(unitFrame)
+    
+    UpdateCustomAuras(unitFrame);
     UpdateAuras(unitFrame, unitFrame.CCAuras, 'HARMFUL', true, core.Config.CCWhitelist);
     UpdateAuras(unitFrame, unitFrame.BuffAuras, 'HELPFUL', true, core.Config.BuffWhitelist);
 end
@@ -581,7 +704,7 @@ end
 
 local function SetupClassResourcePoints(classResource, max)
     for i = 1, max do
-        local width = (140.0/max) - CLASS_RESOURCE_SPACING;
+        local width = (CLASS_RESOURCE_WIDTH/max) - CLASS_RESOURCE_SPACING;
         local position = (width * (i-1)) + (CLASS_RESOURCE_SPACING * (i-1)) + 1;
 
         classResource[i]:SetSize(width, CLASS_RESOURCE_HEIGHT);
@@ -864,13 +987,13 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.customAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
     namePlate.UnitFrame.customAuras:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 2);
     namePlate.UnitFrame.customAuras:SetWidth(140);
-    namePlate.UnitFrame.customAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.customAuras:SetHeight(AURA_ICON_HEIGHT);
     namePlate.UnitFrame.customAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);    
 
     namePlate.UnitFrame.CCAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
     namePlate.UnitFrame.CCAuras:SetPoint("BOTTOM", namePlate.UnitFrame.customAuras, "TOP", 0, 2);
     namePlate.UnitFrame.CCAuras:SetWidth(140);
-    namePlate.UnitFrame.CCAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.CCAuras:SetHeight(AURA_ICON_HEIGHT);
     namePlate.UnitFrame.CCAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     namePlate.UnitFrame.castBar = CreateFrame("StatusBar", nil, namePlate.UnitFrame);
@@ -894,13 +1017,13 @@ function EnemyNamePlate:Created(namePlate)
     namePlate.UnitFrame.BuffAuras = CreateFrame("Frame", nil, namePlate.UnitFrame);
     namePlate.UnitFrame.BuffAuras:SetPoint("TOP", namePlate.UnitFrame.castBar, "BOTTOM", 0, -4);
     namePlate.UnitFrame.BuffAuras:SetWidth(140);
-    namePlate.UnitFrame.BuffAuras:SetHeight(AURA_ICON_SIZE);
+    namePlate.UnitFrame.BuffAuras:SetHeight(AURA_ICON_HEIGHT);
     namePlate.UnitFrame.BuffAuras:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
     -- Class resource, combo points, holy power, shards m.m. 
     namePlate.UnitFrame.classResource = CreateFrame("Frame", nil, namePlate.UnitFrame);
-    namePlate.UnitFrame.classResource:SetPoint("BOTTOM", namePlate.UnitFrame.healthBar, "TOP", 0, 4);
-    namePlate.UnitFrame.classResource:SetWidth(140);
+    namePlate.UnitFrame.classResource:SetPoint("BOTTOM", namePlate.UnitFrame.healthBar, "TOP", 0, 6);
+    namePlate.UnitFrame.classResource:SetWidth(CLASS_RESOURCE_WIDTH);
     namePlate.UnitFrame.classResource:SetHeight(CLASS_RESOURCE_HEIGHT);
     namePlate.UnitFrame.classResource:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 2);
 
@@ -909,11 +1032,22 @@ function EnemyNamePlate:Created(namePlate)
 		namePlate.UnitFrame.classResource[i]:SetFrameLevel(namePlate.UnitFrame.classResource:GetFrameLevel() + 1);
 		namePlate.UnitFrame.classResource[i].texture = namePlate.UnitFrame.classResource[i]:CreateTexture(nil, "BACKGROUND");
 		namePlate.UnitFrame.classResource[i].texture:SetAllPoints(namePlate.UnitFrame.classResource[i]);
-        namePlate.UnitFrame.classResource[i].texture:SetColorTexture(0.8, 0.8, 0.8);
+        namePlate.UnitFrame.classResource[i].texture:SetColorTexture(CLASS_RESOURCE_COLOR.r, CLASS_RESOURCE_COLOR.g, CLASS_RESOURCE_COLOR.b);
+        namePlate.UnitFrame.classResource[i]:Hide();
 	end
 
     SetupClassResourcePoints(namePlate.UnitFrame.classResource, 6);
     namePlate.UnitFrame.classResource:Hide();
+
+    --namePlate.UnitFrame.art = CreateFrame("Frame", nil, namePlate.UnitFrame);
+    --namePlate.UnitFrame.art:SetPoint("BOTTOM", namePlate.UnitFrame.name, "TOP", 0, 2);
+    --namePlate.UnitFrame.art:SetWidth(140);
+    --namePlate.UnitFrame.art:SetHeight(50);
+    --namePlate.UnitFrame.art:SetFrameLevel(namePlate.UnitFrame:GetFrameLevel() + 4);
+    --namePlate.UnitFrame.art.texture = namePlate.UnitFrame.art:CreateTexture(nil, "BACKGROUND");
+    --namePlate.UnitFrame.art.texture = namePlate.UnitFrame.art:CreateTexture(nil, "BACKGROUND");
+    --namePlate.UnitFrame.art.texture:SetAllPoints(namePlate.UnitFrame.art);
+    --namePlate.UnitFrame.art.texture:SetTexture("media/nameplate.tga");
 
     --namePlate.UnitFrame.classResource.texture = namePlate.UnitFrame.classResource:CreateTexture(nil, "OVERLAY");
     --namePlate.UnitFrame.classResource.texture:SetAllPoints(namePlate.UnitFrame.classResource);
